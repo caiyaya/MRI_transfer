@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="gzh@10.192.40.204:22 password (5)" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="gzh@10.192.40.204:22 password (3)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/gzh/DeepDA/code" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="gzh@10.192.40.204:22 password (4)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/gzh/DeepDA/code" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="gzh@10.192.40.204:22 password (5)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/gzh/DeepDA/code" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
