@@ -40,3 +40,15 @@ P.S.
 2. 由于我会把每次验证集中表现最好的都存起来，所以每次做完一次实验后model_log中的文件就要清空一次，不然有可能会加载到之前保存的模型
 
 如果您在运行过程中有什么问题欢迎随时联系我~
+
+
+## 0129 数据集 dataloader部分整理- 基础版的traintestSplit 划分
+目前数据集重新组织格式如下：
+- data
+   - human
+      - npy_128
+      - label
+   - mice
+      - npy_128
+      - label
+mice作为源域，human作为目标域， 对human进行五折划分，其中0.8为train 0.1为valid 0.1为test，模型会根据在valid上的表现进行参数保存，最后在test部分进行模型性能评估

@@ -68,7 +68,6 @@ class Solver2(object):
         print("dataset loading......")
 
         # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
-        print("break point")
         s_train_list = s_train_select
         s_train_label_list = [s.replace('npy_128', 'label') for s in s_train_list]
 
@@ -79,6 +78,7 @@ class Solver2(object):
         t_valid_label_list = [t.replace('npy_128', 'label') for t in t_valid_select]
 
         # 有oversampling的版本
+        # oversampling 策略？
         self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.xt_valid, self.yt_valid  = KflodDataloader(
             self.slice_size,
             self.modality, self.class_num,
@@ -340,6 +340,7 @@ class Solver2(object):
 
     # 验证
     def valid_process(self, epoch, dataset):
+        # 这里传入的目标域的valid部分
         Acc = []
         Loss = []
         Sens = []
@@ -613,6 +614,7 @@ class Solver2(object):
             if int(mm) == self.mark and float(acc) >= best_acc:
                 best_result = file
                 best_acc = float(acc)
+        # 这里看下 best_result 是否有问题
         read_path = os.path.join(self.model_save_path, best_result)
         fea_path = os.path.join(read_path, "fe_Net.pkl")
         cls_path = os.path.join(read_path, "lb_Cls.pkl")

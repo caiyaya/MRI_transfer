@@ -33,23 +33,23 @@ def main():
     for file_path in os.listdir(target):
         t_path.append(os.path.join(target, file_path))
 
-    # -------------------五折划分训练集和验证集：源领域和目标领域--------------------
+    # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
     mark = 1
-    kf = KFold(n_splits=5, shuffle=True)
+    kf = KFold(n_splits=5, shuffle=True) # 五折相当于0.2，后续可以调整
     for (t_train_index, t_valid_index) in kf.split(t_path):
         print("-----------------------------------------")
         print("The "+str(mark)+"th ZHE experiment")
-        print("Select target valid set:", t_valid_index)
+        print("Select target validset and testset（0.2）:", t_valid_index)
         t_train_select, t_valid_select = np.array(t_path)[t_train_index], np.array(t_path)[t_valid_index]
 
-        solver = Solver2(mark=mark, s_train_select = s_path, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
+        solver = Solver2(mark=mark, s_train_select=s_path, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
                         config=config)
 
         solver.train_and_valid()
-        solver.load_model()  # 注释第26行，调这里
+        solver.load_model()
 
         print('✿' * 70)
-        solver.test_source()
+        # solver.test_source()
         solver.test_target()
         print('✿' * 46)
         print("\n")
