@@ -69,7 +69,19 @@ class Solver2(object):
 
         # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
         s_train_list = s_train_select
-        s_train_label_list = [s.replace('npy', 'label') for s in s_train_list]
+        # 这里需要对aug增加特判逻辑
+        s_train_label_list = []
+        for s in s_train_list:
+            if "aug" in s:
+                parts = s.split('/')
+                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+                new_parts = parts[:-2] + [parts[-1]]
+                new_parts[3] = 'label'
+                new_path = '/'.join(new_parts)
+                s_train_label_list.append(new_path)
+            else:
+                s_train_label_list.append(s.replace('npy', 'label'))
+
 
         # 这里要根据 t_train_select 构建 训练和测试数据对
         print("break point")
@@ -89,6 +101,46 @@ class Solver2(object):
 
         t_valid_label_list = [t.replace('npy', 'label') for t in t_valid_list]
 
+        # 这里判断是否要增加aug部分的数据
+        if config.aug == 1:
+            t_train_list_aug = []
+            t_path_aug = t_path.replace('npy', 'npy_aug')
+            for file_path_augs in os.listdir(t_path_aug):
+                for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
+                    if file_path.split('_')[1] in t_train_select_set:
+                        aug = os.path.join(file_path_augs, file_path)
+                        t_train_list_aug.append(os.path.join(t_path_aug, aug))
+            t_train_label_list_aug = []
+            for t in t_train_list_aug:
+                parts = t.split('/')
+                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+                new_parts = parts[:-2] + [parts[-1]]
+                new_parts[3] = 'label'
+                new_path = '/'.join(new_parts)
+                t_train_label_list_aug.append(new_path)
+
+            # valid 类似的处理
+            t_valid_list_aug = []
+            t_path_aug = t_path.replace('npy', 'npy_aug')
+            for file_path_augs in os.listdir(t_path_aug):
+                for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
+                    if file_path.split('_')[1] in t_valid_select_set:
+                        aug = os.path.join(file_path_augs, file_path)
+                        t_valid_list_aug.append(os.path.join(t_path_aug, aug))
+            t_valid_label_list_aug = []
+            for t in t_valid_list_aug:
+                parts = t.split('/')
+                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+                new_parts = parts[:-2] + [parts[-1]]
+                new_parts[3] = 'label'
+                new_path = '/'.join(new_parts)
+                t_valid_label_list_aug.append(new_path)
+            # 如果采用增强，则train 和 valid 要加入
+            t_train_list.extend(t_train_list_aug)
+            t_train_label_list.extend(t_train_label_list_aug)
+
+            t_valid_list.extend(t_valid_list_aug)
+            t_valid_label_list.extend(t_valid_label_list_aug)
 
         # 有oversampling的版本
         # oversampling 策略？

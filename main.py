@@ -39,17 +39,12 @@ def main():
         t_path.append(os.path.join(target, file_path))
 
     # 如果需要使用aug数据
-    # if config.aug == 1:
-    #     source_aug = r"./data_new/mice/npy_aug"
-    #     for file_augs in os.listdir(source_aug):
-    #         for file_path in os.listdir(file_augs):
-    #             file_path = os.path.join(file_augs, file_path)
-    #             s_path.append(os.path.join(source_aug, file_path))
-    #     target_aug = r"./data_new/human/npy_aug"
-    #     for file_augs in os.listdir(target_aug):
-    #         for file_path in os.listdir(file_augs):
-    #             file_path = os.path.join(file_augs, file_path)
-    #             t_path.append(os.path.join(source_aug, file_path))
+    if config.aug == 1:
+        source_aug = r"./data_new/mice/npy_aug"
+        for file_augs in os.listdir(source_aug):
+            for file_path in os.listdir(os.path.join(source_aug, file_augs)):
+                file_path = os.path.join(file_augs, file_path)
+                s_path.append(os.path.join(source_aug, file_path))
 
 
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
