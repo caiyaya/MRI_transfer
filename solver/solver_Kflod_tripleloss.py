@@ -225,9 +225,11 @@ class Solver2(object):
             # align_loss = cmd(xs_last, xt_last)
 
             # ----------------------对抗损失------------------- #
+            # todo: 引入loss函数更新 + 加入互信息正则化项（类别敏感的正则化项）
             xs_adv = self.da_Net(xs_feature)
             xt_adv = self.da_Net(xt_last)
             adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
+
             # ----------------------三元组损失------------------- #
             # margin = 0.2
             # triple_fn = OnlineTripletLoss(margin, SemihardNegativeTripletSelector(margin)).cuda()
