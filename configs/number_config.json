@@ -18,7 +18,8 @@
   "check_epoch": 12,
   "early_stop_step": 10,
   "interval": 16,
-  "mode": 0
+  "mode": 0,
+  "aug": 1
 }
 
 

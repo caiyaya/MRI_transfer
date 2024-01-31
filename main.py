@@ -22,27 +22,49 @@ np.random.seed(1024)
 
 def main():
     model_save_path = './model_log'  # 模型存储路径
-    source = r"./data/mice/npy_128"
-    target = r"./data/human/npy_128"
+    source = r"./data_new/mice/npy"
+    target = r"./data_new/human/npy"
 
+    # 增加 s_ids 用来做train 和 test 的分割
     s_path = []
+    s_ids = set()
     for file_path in os.listdir(source):
+        s_ids.add(file_path.split('_')[1])
         s_path.append(os.path.join(source, file_path))
 
     t_path = []
+    t_ids = set()
     for file_path in os.listdir(target):
+        t_ids.add(file_path.split('_')[1])
         t_path.append(os.path.join(target, file_path))
+
+    # 如果需要使用aug数据
+    # if config.aug == 1:
+    #     source_aug = r"./data_new/mice/npy_aug"
+    #     for file_augs in os.listdir(source_aug):
+    #         for file_path in os.listdir(file_augs):
+    #             file_path = os.path.join(file_augs, file_path)
+    #             s_path.append(os.path.join(source_aug, file_path))
+    #     target_aug = r"./data_new/human/npy_aug"
+    #     for file_augs in os.listdir(target_aug):
+    #         for file_path in os.listdir(file_augs):
+    #             file_path = os.path.join(file_augs, file_path)
+    #             t_path.append(os.path.join(source_aug, file_path))
+
 
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
     mark = 1
     kf = KFold(n_splits=5, shuffle=True) # 五折相当于0.2，后续可以调整
-    for (t_train_index, t_valid_index) in kf.split(t_path):
+    # for (t_train_index, t_valid_index) in kf.split(t_path):
+    t_ids = list(t_ids)
+    for (t_train_index, t_valid_index) in kf.split(list(t_ids)):
         print("-----------------------------------------")
         print("The "+str(mark)+"th ZHE experiment")
         print("Select target validset and testset（0.2）:", t_valid_index)
-        t_train_select, t_valid_select = np.array(t_path)[t_train_index], np.array(t_path)[t_valid_index]
+        # 这里根据ids 来对t_path 进行分割
+        t_train_select, t_valid_select = np.array(t_ids)[t_train_index], np.array(t_ids)[t_valid_index]
 
-        solver = Solver2(mark=mark, s_train_select=s_path, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
+        solver = Solver2(mark=mark, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
                         config=config)
 
         solver.train_and_valid()

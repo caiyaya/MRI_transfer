@@ -20,7 +20,7 @@ plt.switch_backend('Agg')
 imgPath = "./caicaiImage/img"
 
 class Solver2(object):
-    def __init__(self, mark, s_train_select, t_train_select, t_valid_select,  model_save_path, config):
+    def __init__(self, mark, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config):
 
         self.mark = mark # 交叉验证具体哪一折
         self.mode = config.mode  # 判定是哪一个病症
@@ -69,13 +69,26 @@ class Solver2(object):
 
         # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
         s_train_list = s_train_select
-        s_train_label_list = [s.replace('npy_128', 'label') for s in s_train_list]
+        s_train_label_list = [s.replace('npy', 'label') for s in s_train_list]
 
-        t_train_list = t_train_select
-        t_train_label_list = [t.replace('npy_128', 'label') for t in t_train_list]
+        # 这里要根据 t_train_select 构建 训练和测试数据对
+        print("break point")
+        t_train_select_set = set(t_train_select)
+        t_train_list = []
+        for file_path in os.listdir(t_path):
+            if file_path.split('_')[1] in t_train_select_set:
+                t_train_list.append(os.path.join(t_path, file_path))
 
-        t_valid_list = t_valid_select
-        t_valid_label_list = [t.replace('npy_128', 'label') for t in t_valid_select]
+        t_train_label_list = [t.replace('npy', 'label') for t in t_train_list]
+
+        t_valid_select_set = set(t_valid_select)
+        t_valid_list = []
+        for file_path in os.listdir(t_path):
+            if file_path.split('_')[1] in t_valid_select_set:
+                t_valid_list.append(os.path.join(t_path, file_path))
+
+        t_valid_label_list = [t.replace('npy', 'label') for t in t_valid_list]
+
 
         # 有oversampling的版本
         # oversampling 策略？

@@ -52,3 +52,6 @@ P.S.
       - npy_128
       - label
 mice作为源域，human作为目标域， 对human进行五折划分，其中0.8为train 0.1为valid 0.1为test，模型会根据在valid上的表现进行参数保存，最后在test部分进行模型性能评估
+
+## 0131 dataloader 重构 增加 aug 和 5种不同的切片
+// json中配置aug参数， 0 means 不使用增强数据；1 means 使用增强数据
