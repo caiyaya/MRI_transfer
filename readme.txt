@@ -86,3 +86,8 @@ mice作为源域，human作为目标域， 对human进行五折划分，其中0.
   aug 增强是否需要？需要的话 需要哪种类型的增强？
 
   9中不同模态的信息，需要哪几个？
+
+ 增加 autoshell脚本
+ 运行方式 python AutoShell.py
+ 这里为了方便后台运行，终端输出的log 重定向到了log_new.log下 可以（后台运行程序）后 通过log日志看结果
+ 后台运行程序可以使用 nohup 或是 tmux 推荐使用 后者
