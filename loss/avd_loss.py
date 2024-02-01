@@ -16,6 +16,25 @@ def group_adv_loss(xs, xt):
 
     return g_adv_loss
 
+def group_adv_loss_new(xs, xt, regularization_strength=0.1):
+    domain_pred = torch.cat([xs, xt])
+    domain_y_ind = torch.cat([torch.ones(xs.shape[0], dtype=torch.long), torch.zeros(xt.shape[0], dtype=torch.long)])
+    domain_y_ind = domain_y_ind.cuda()
+    cross_loss = nn.CrossEntropyLoss()
+    g_adv_loss = cross_loss(domain_pred, domain_y_ind)
+
+    # 平方对抗损失函数
+    squared_adv_loss = torch.mean(g_adv_loss ** 2)
+
+    # domain_y = F.one_hot(domain_y_ind, num_classes=2).float()
+    # g_adv_loss = F.binary_cross_entropy_with_logits(domain_pred, domain_y)
+    # 增加正则项，danet学习域不变特征，减少过拟合风险
+    # 正则项 为 计算源域和目标域特征之间均值差的L2范数
+    mean_diff = torch.mean(xs, dim=0) - torch.mean(xt, dim=0)
+    reg_loss = torch.norm(mean_diff, p=2)
+    total_loss = squared_adv_loss + regularization_strength * reg_loss
+    return total_loss
+
 
 def domain_adv_loss(s, t, ys, pseudo_yt, gpu):
     # xs_c0, xs_c1, xs_c2 = data_group(s, ys, gpu)
