@@ -16,7 +16,7 @@
   "momentum": 0.99,
   "weight_decay": 1e-3,
   "check_epoch": 12,
-  "early_stop_step": 3,
+  "early_stop_step": 1,
   "interval": 16,
   "mode": 0,
   "aug": 0
