@@ -9,6 +9,9 @@ from configs.config import *
 from print2log import *
 from sklearn.model_selection import KFold, StratifiedKFold
 import argparse
+from sklearn import svm
+from sklearn.metrics import accuracy_score
+from static_dataread.dataset_read import clf_data_loader
 
 
 # hyper-parameter
@@ -24,6 +27,7 @@ def main():
     model_save_path = './model_log'  # 模型存储路径
     source = r"./data_new/mice/npy"
     target = r"./data_new/human/npy"
+    extra = r"./data_new/human_extra" # 89个 需要按照batch 扩增
 
     # 增加 s_ids 用来做train 和 test 的分割
     s_path = []
@@ -59,8 +63,15 @@ def main():
         # 这里根据ids 来对t_path 进行分割
         t_train_select, t_valid_select = np.array(t_ids)[t_train_index], np.array(t_ids)[t_valid_index]
 
-        solver = Solver2(mark=mark, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
-                        config=config)
+        # 提取train中id 对应的 参数信息
+        # svm训练 参数信息
+
+        x_train, y_train = clf_data_loader(extra, target, t_train_select)
+        clf = svm.SVC(kernel='poly', degree=3, probability=True)  # 使用线性核
+        clf.fit(x_train, y_train)
+
+        solver = Solver2(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
+                        config=config, clfModel=clf)
 
         solver.train_and_valid()
         solver.load_model()

@@ -13,14 +13,16 @@ from attention_model.ECAResNet import eca_resnet20
 from attention_model.cbam_net import CBAM_Net
 from loss.tripletloss import *
 from loss import avd_loss
-
+from static_dataread.dataset_read import clf_data_loader
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
+
 plt.switch_backend('Agg')
 
 imgPath = "./caicaiImage/img"
 
 class Solver2(object):
-    def __init__(self, mark, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config):
+    def __init__(self, mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
 
         self.mark = mark # 交叉验证具体哪一折
         self.mode = config.mode  # 判定是哪一个病症
@@ -56,6 +58,7 @@ class Solver2(object):
         self.feature_dim = config.feature_dim
 
         # 在迭代中赋值，不需要传参的参数
+        self.clf = clfModel
         self.fe_Net = None  # 特征提取器框架
         self.lb_Cls = None  # 分类器框架
         self.da_Net = None  # 域对抗网络
@@ -166,20 +169,37 @@ class Solver2(object):
 
         # 增加逻辑 将valid部分拆分为 test 和 valid
         # self.xt_valid, self.yt_valid
+        # 这里有问题，可能对某个human重复采样，测算其最后结果，尽可能评估不同病人的 -> 顺序采样即可
+        # 这里应该直接前半部分是 valid 后半部分是test
         valid_size = len(self.xt_valid)
 
         indices = np.arange(valid_size)
-        np.random.shuffle(indices)
+        # np.random.shuffle(indices)
         split = int(valid_size * 0.5)  # 50%用于拆分
         self.xt_valid1 = np.array([self.xt_valid[i] for i in indices[:split]])
         self.yt_valid1 = np.array([self.yt_valid[i] for i in indices[:split]])
         self.xt_valid2 = np.array([self.xt_valid[i] for i in indices[split:]])
         self.yt_valid2 = np.array([self.yt_valid[i] for i in indices[split:]])
 
+        # 这里 indices 是随机重拍的 valid 部分 indices[:split]； test部分indices[split:]
+        # 这里需要获取的x_test 和 y_test 是 符合 t_valid_select顺序的
+        index = np.arange(valid_size/5)
+        spl = int(valid_size/5 * 0.5)
+        clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
+        clf_t_test_select = [t_valid_select[int(i)] for i in index[:spl]]
+
+        x_valid, y_valid = clf_data_loader(extra, t_path, clf_t_valid_select)
+
+        print("clf valid 测试：")
+        y_pred = self.clf.predict(x_valid)
+        print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+        self.x_test, self.y_test = clf_data_loader(extra, t_path, clf_t_test_select)
+
+
         # 载入Dataloader
         self.train_dataset = generate_dataset(self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.batch_size, self.gpu)
         self.valid_dataset = generate_dataset(self.xt_valid1, self.yt_valid1, self.xt_valid1, self.yt_valid1, self.batch_size, self.gpu)
-        self.test_dataset =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
+        self.test_dataset  =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
 
 
     def train_and_valid(self):
@@ -475,6 +495,8 @@ class Solver2(object):
         label_out_all = torch.LongTensor().cuda()
         # ✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿ PRINT ✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿
         for step, data in enumerate(dataset):
+            # 引入 self clf
+            x_svm = self.clf.predict_proba(self.x_test[step])
             xt = data['T']
             yt = data['T_label']
             if self.gpu:
@@ -494,7 +516,7 @@ class Solver2(object):
                 cls_loss = cross_loss(xt_out, yt)
                 loss = cls_loss
                 # acc, Sens, Prec, F1 = accuracy(xt_out, yt, self.class_num, 0)
-                acc = accuracy1(xt_out, yt, self.class_num, 0)
+                acc = accuracy1(x_svm, xt_out, yt, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
 

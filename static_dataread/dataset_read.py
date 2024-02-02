@@ -2,6 +2,52 @@ from static_dataread.svhn import load_svhn
 from static_dataread.mnist import load_mnist
 from static_dataread.usps import load_usps
 from static_dataread.unaligned_data_loader import UnalignedDataLoader
+import os
+import numpy as np
+def clf_data_loader(extra, target, t_train_select):
+    """
+    准备训练数据和标签。
+
+    参数:
+    - extra: 包含特征数据文件的目录路径。
+    - target: 包含标签数据文件的目录路径。
+    - t_train_select: 选择的训练集ID列表。
+
+    返回:
+    - x_train: 训练数据数组。
+    - y_train: 训练标签数组。
+    """
+    t_train_select_set = set(t_train_select)
+    clf_train_list = []
+    for file_path in os.listdir(extra):
+        if file_path.split("_")[1].split(".")[0] in t_train_select_set:
+            clf_train_list.append(os.path.join(extra, file_path))
+    clf_train_label_list = []
+    for file_path in os.listdir(target.replace('npy', 'label')):
+        if file_path.split("_")[1] in t_train_select_set:
+            clf_train_label_list.append(os.path.join(target.replace('npy', 'label'), file_path))
+
+    # 准备分类器的数据
+    x_train = []
+    y_train = []
+    for data_path in clf_train_list:
+        data = np.load(data_path)
+        for i in range(5): ## 数据会扩增为五份
+            x_train.append(data)
+
+    for label_path in clf_train_label_list:
+        label_path = os.path.join(label_path, 'label.txt')
+        with open(label_path, 'r') as label_file:
+            label = label_file.readline().strip().split(',')[0]  # 读取第一行的第一个值
+            label = int(label)  # 转换为整数
+            # 根据label值进行处理，小于3则为0，否则为1
+            label = 0 if label < 3 else 1
+            y_train.append(label)
+
+    x_train = np.array(x_train)
+    y_train = np.array(y_train)
+
+    return x_train, y_train
 
 
 def return_dataset(domain_name, usps, scale, all_use):

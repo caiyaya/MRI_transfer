@@ -219,12 +219,14 @@ def accuracy(x_out, y_true, classes, isPlot, save_tag=''):
     # F1 = f1_score(y, y_, average='weighted')
     return Acc # , Sens, Prec, F1 #, cnf_mat
 
-def accuracy1(x_out, y_true, classes, isPlot, save_tag=''):
+def accuracy1(x_svm, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
+    x_pro = (x_svm + x_pro) / 2
     y_pred = torch.argmax(x_pro, dim=1)
     print("y_true:", y_true)
     print("y_pred:", y_pred)
+    # 这里增加 svm的预测？
 
     # 计算混淆矩阵
     y = np.zeros(len(y_true))
