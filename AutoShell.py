@@ -57,7 +57,8 @@ with open(log_file_path, 'w') as log_file:
                                 shutil.rmtree(file_path)
                         except Exception as e:
                             log_file.write(f'Failed to delete {file_path}. Reason: {e}\n')
-
+                # 删除后建立新的即可
+                os.makedirs(model_log_dir, exist_ok=True)
                 # 打印分隔符以区分每次执行的输出
                 log_file.write('-' * 50 + '\n')
                 log_file.flush()  # 确保写入文件
