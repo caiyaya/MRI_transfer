@@ -222,11 +222,14 @@ def accuracy(x_out, y_true, classes, isPlot, save_tag=''):
 def accuracy1(x_svm, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
-    x_pro = (x_svm + x_pro) / 2
-    y_pred = torch.argmax(x_pro, dim=1)
+    # 通过融合的方式 将svm的预测概率加入
+
+    x_fuse = (x_svm + x_pro) / 2
+    y_pred = torch.argmax(x_fuse, dim=1)
+    print("x_pro:", x_pro)
+    print("x_svm:", x_svm)
     print("y_true:", y_true)
     print("y_pred:", y_pred)
-    # 这里增加 svm的预测？
 
     # 计算混淆矩阵
     y = np.zeros(len(y_true))

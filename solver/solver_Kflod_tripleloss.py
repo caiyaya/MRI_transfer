@@ -22,8 +22,8 @@ plt.switch_backend('Agg')
 imgPath = "./caicaiImage/img"
 
 class Solver2(object):
-    def __init__(self, mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
-
+    def __init__(self,  mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
+        self.config = config
         self.mark = mark # 交叉验证具体哪一折
         self.mode = config.mode  # 判定是哪一个病症
 
@@ -183,10 +183,13 @@ class Solver2(object):
 
         # 这里 indices 是随机重拍的 valid 部分 indices[:split]； test部分indices[split:]
         # 这里需要获取的x_test 和 y_test 是 符合 t_valid_select顺序的
+        # 这里对应反了！！
+        # valid1 对应test valid2 对应 valid
         index = np.arange(valid_size/5)
         spl = int(valid_size/5 * 0.5)
-        clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
         clf_t_test_select = [t_valid_select[int(i)] for i in index[:spl]]
+        clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
+
 
         x_valid, y_valid = clf_data_loader(extra, t_path, clf_t_valid_select)
 
@@ -198,8 +201,8 @@ class Solver2(object):
 
         # 载入Dataloader
         self.train_dataset = generate_dataset(self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.batch_size, self.gpu)
-        self.valid_dataset = generate_dataset(self.xt_valid1, self.yt_valid1, self.xt_valid1, self.yt_valid1, self.batch_size, self.gpu)
-        self.test_dataset  =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
+        self.test_dataset = generate_dataset(self.xt_valid1, self.yt_valid1, self.xt_valid1, self.yt_valid1, self.batch_size, self.gpu)
+        self.valid_dataset  =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
 
 
     def train_and_valid(self):
@@ -496,7 +499,14 @@ class Solver2(object):
         # ✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿ PRINT ✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿✿
         for step, data in enumerate(dataset):
             # 引入 self clf
-            x_svm = self.clf.predict_proba(self.x_test[step])
+            bs = self.config.batch_size
+            if step*bs+bs < len(self.x_test):
+                x_svm = self.clf.predict_proba(self.x_test[step*bs: step*bs+bs, :])
+            else:
+                if self.x_test[step * bs:].shape[0] > 0:
+                    x_svm = self.clf.predict_proba(self.x_test[step * bs:, :])
+                else:
+                    continue
             xt = data['T']
             yt = data['T_label']
             if self.gpu:
@@ -516,7 +526,7 @@ class Solver2(object):
                 cls_loss = cross_loss(xt_out, yt)
                 loss = cls_loss
                 # acc, Sens, Prec, F1 = accuracy(xt_out, yt, self.class_num, 0)
-                acc = accuracy1(x_svm, xt_out, yt, self.class_num, 0)
+                acc = accuracy1(torch.tensor(x_svm).cuda(), xt_out, yt, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
 

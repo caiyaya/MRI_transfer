@@ -67,6 +67,7 @@ def main():
         # svm训练 参数信息
 
         x_train, y_train = clf_data_loader(extra, target, t_train_select)
+        print("y_train:", y_train)
         clf = svm.SVC(kernel='poly', degree=3, probability=True)  # 使用线性核
         clf.fit(x_train, y_train)
 
