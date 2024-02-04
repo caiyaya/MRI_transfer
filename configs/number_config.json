@@ -7,7 +7,7 @@
   "class_num": 2,
   "feature_dim" : 128,
   "alpha": 0,
-  "beta": 0.3,
+  "beta": 0.01,
   "epoch_num": 200,
   "batch_size": 8,
   "optimizer": "adam",
@@ -16,7 +16,7 @@
   "momentum": 0.99,
   "weight_decay": 1e-3,
   "check_epoch": 12,
-  "early_stop_step": 1,
+  "early_stop_step": 15,
   "interval": 16,
   "mode": 0,
   "aug": 0

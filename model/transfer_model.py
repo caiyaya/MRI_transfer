@@ -665,24 +665,19 @@ def grad_reverse(x, lambd=1.0):
 class Label_Classifier(nn.Module):
     def __init__(self, inplane, class_num):
         super(Label_Classifier, self).__init__()
-        # self.fc_layer = nn.Sequential(nn.Linear(64, class_num))
-        self.fc_layer1 = nn.Sequential(nn.Linear(256, 64), nn.ReLU(inplace=False))
+        self.fc_layer1 = nn.Sequential(nn.Linear(inplane, 64), nn.ReLU(inplace=False))
         self.fc_layer2 = nn.Sequential(nn.Linear(64, 32), nn.ReLU(inplace=False))
-        self.fc_layer3 = nn.Sequential(nn.Linear(inplane, class_num))
-        # self.fc_layer1 = nn.Sequential(nn.Linear(3072, 2048), nn.ReLU(inplace=False))
-        # self.fc_layer2 = nn.Sequential(nn.Linear(2048, class_num))
+        self.fc_layer3 = nn.Sequential(nn.Linear(32, class_num))
         self.initialize()
 
     def initialize(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 init.kaiming_normal_(m.weight)
-
-
     # 324
     def forward(self, x):
-        # x = self.fc_layer1(x)
-        # x = self.fc_layer2(x)
+        x = self.fc_layer1(x)
+        x = self.fc_layer2(x)
         x = self.fc_layer3(x)
         return x
 

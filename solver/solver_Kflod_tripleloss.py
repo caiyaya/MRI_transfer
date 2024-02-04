@@ -299,6 +299,11 @@ class Solver2(object):
         self.model_train()
         self.scheduler_step()
 
+        # 每轮打印 cls loss 和 adv loss 观察变化
+        total_cls_loss = 0.0
+        total_adv_loss = 0.0
+        total_batches = 0
+
         for step, train_data in enumerate(dataset):
             xs = train_data['S']
             xt = train_data['T']
@@ -326,9 +331,9 @@ class Solver2(object):
             # todo: 引入loss函数更新 + 加入互信息正则化项（类别敏感的正则化项）
             xs_adv = self.da_Net(xs_feature)
             xt_adv = self.da_Net(xt_last)
-            # adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
+            adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
             # 平方对抗损失函数 + 类别敏感的正则化项（L2）
-            adv_loss = avd_loss.group_adv_loss_new(xs_adv, xt_adv)
+            # adv_loss = avd_loss.group_adv_loss_new(xs_adv, xt_adv)
 
             # ----------------------三元组损失------------------- #
             # margin = 0.2
@@ -345,6 +350,11 @@ class Solver2(object):
             # -----------------只有分类损失---------------------- #
             # loss = cls_loss
             # -----------------分类+对抗---------------------- #
+            # 累加损失值和批次计数
+            total_cls_loss += cls_loss.item()
+            total_adv_loss += adv_loss.item()
+            total_batches += 1
+
             loss = cls_loss + self.beta * adv_loss
             # print("***********************************adv:", adv_loss)
             # -----------------分类+对齐---------------------- #
@@ -390,6 +400,26 @@ class Solver2(object):
         # print("Loss_last = ", Loss_last)
         # print("Loss_last.type = ", type(Loss_last))
         print('After Epoch ', epoch,  ' :')
+        # 打印cls loss 和 adv loss
+        avg_cls_loss = total_cls_loss / total_batches
+        avg_adv_loss = total_adv_loss / total_batches
+        print(
+            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}')
+        # 基于损失反馈的动态调整self.beta
+        # 如何给定调整策略？
+        # 设置阈值和调整因子
+        threshold_increase = 2  # 当adv_loss是cls_loss的2倍时开始减少beta
+        adjust_factor_decrease = 0.9  # 减少beta的因子
+
+        # 动态调整beta
+        if avg_adv_loss / avg_cls_loss > threshold_increase:
+            self.beta *= adjust_factor_decrease
+
+        # 保证beta在合理范围内
+        self.beta = max(0.001, min(self.beta, 0.01))
+
+
+
         print('     [Train S] Acc: {a:.3f}, Loss: {l}'.format(a=Acc_last, l=Loss_last))
 
         return Acc_last, Loss_last
@@ -656,8 +686,8 @@ class Solver2(object):
             # 第一个参数就是所使用的优化器对象，第二个参数就是每多少轮循环后更新一次学习率(lr)，第三个参数就是每次更新lr的gamma倍（lr = lr *gamma）
             self.sch_lb_Cls = optim.lr_scheduler.StepLR(self.opt_lb_Cls, 10, gamma=0.1, last_epoch=-1)
         elif which_sch == 'multi_step':
-            self.sch_fe_Net = optim.lr_scheduler.MultiStepLR(self.opt_fe_Net, milestones=[100, 150])
-            self.sch_lb_Cls = optim.lr_scheduler.MultiStepLR(self.opt_lb_Cls, milestones=[100, 150])
+            self.sch_fe_Net = optim.lr_scheduler.MultiStepLR(self.opt_fe_Net, milestones=[5, 10])
+            self.sch_lb_Cls = optim.lr_scheduler.MultiStepLR(self.opt_lb_Cls, milestones=[5, 10])
 
     def reset_grad(self):
         self.opt_fe_Net.zero_grad()
