@@ -8,7 +8,7 @@ from imblearn.over_sampling import RandomOverSampler
 from static_dataread.unaligned_data_loader import UnalignedDataLoader
 from utils import *
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
-
+import time
 """
 多模态版
 """
@@ -417,8 +417,7 @@ def KflodDataloader(slice_size, mo_channel, class_num, mode, source_dir, label_s
     :param mode: 0：纤维化；1：脂变；2：炎症
     :return: 源域数据，源域标签（one-hot），目标域数据，目标域标签（one-hot），病例数
     """
-    # print("Source data Loading......")
-    # xs.shape = (病例数，切片数，宽，高)
+    start_time = time.time()
 
     # 二分类版
     xs, ys1, ys2, ys3, s_order, s_height, s_width = return_dataset_train_2(source_dir, label_s_dir, modality=mo_channel, slice_size=slice_size)
@@ -426,12 +425,10 @@ def KflodDataloader(slice_size, mo_channel, class_num, mode, source_dir, label_s
 
     xtv, ytv1, ytv2, ytv3, tv_order, tv_height, tv_width = return_dataset_train_2(target_v_dir, label_tv_dir, modality=mo_channel, slice_size=slice_size)
 
-
-    # 五分类版
-    # xs, ys1, ys2, ys3, s_order, s_height, s_width = return_dataset_train(source_dir, label_s_dir, modality=mo_channel,
-    #                                                                        slice_size=slice_size)
-    # xt, yt1, yt2, yt3, t_order, t_height, t_width = return_dataset_train(target_dir, label_t_dir, modality=mo_channel,
-    #                                                                        slice_size=slice_size)
+    # 埋点6
+    end_time = time.time()  # 获取结束时间
+    print(f"return_dataset_train_2数据加载运行时间: {end_time - start_time} 秒")
+    start_time = time.time()
 
     # 同时也要对 xtv 和 ytv 进行采样 采样参考 valid部分
     if mode == 0:  # 对纤维化进行采样
@@ -443,7 +440,6 @@ def KflodDataloader(slice_size, mo_channel, class_num, mode, source_dir, label_s
 
     xtv_sample_num = xtv_ROS.shape[0]
 
-
     if mode == 0:  # 对纤维化进行采样
         xs_ROS, ys_ROS, xt_ROS, yt_ROS = oversampling(xs, ys1, xt, yt1, class_num)
     if mode == 1:  # 对脂变进行采样
@@ -454,14 +450,6 @@ def KflodDataloader(slice_size, mo_channel, class_num, mode, source_dir, label_s
     xs_sample_num = xs_ROS.shape[0]
     xt_sample_num = xt_ROS.shape[0]
 
-    # 判断源域和目标域的尺寸是否相同（order: 切片张数）
-    # if (s_order == t_order) & (s_height == t_height) & (s_width == t_width) & (xs_sample_num == xt_sample_num):
-    #     order = s_order
-    #     height = s_height
-    #     width = s_width
-    #     sample_num = xs_sample_num
-    # else:
-    #     print("The shape is not identical")
 
     order = s_order
     height = s_height
@@ -470,6 +458,11 @@ def KflodDataloader(slice_size, mo_channel, class_num, mode, source_dir, label_s
     xt_ROS = xt_ROS.reshape((xt_sample_num, order, height, width))
     xtv_ROS = xtv_ROS.reshape((xtv_sample_num, order, height, width))
     # print("Reshape finish!")
+
+    # 埋点7
+    end_time = time.time()  # 获取结束时间
+    print(f"各种reshape数据运行时间: {end_time - start_time} 秒")
+    start_time = time.time()
 
     return xs_ROS, ys_ROS, xt_ROS, yt_ROS, xtv_ROS, ytv_ROS
 

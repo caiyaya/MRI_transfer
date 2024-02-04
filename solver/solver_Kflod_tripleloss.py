@@ -2,7 +2,7 @@ import os
 import torch
 import torch.optim as optim
 from datetime import datetime
-
+import time
 from static_dataread.human_read import *
 from model.transfer_model import *
 from utils import *
@@ -69,6 +69,8 @@ class Solver2(object):
 
         # 载入源数据、源标签、目标数据、目标标签
         print("dataset loading......")
+        # 埋点
+        start_time = time.time()
 
         # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
         s_train_list = s_train_select
@@ -122,28 +124,34 @@ class Solver2(object):
                 new_path = '/'.join(new_parts)
                 t_train_label_list_aug.append(new_path)
 
-            # valid 类似的处理
-            t_valid_list_aug = []
-            t_path_aug = t_path.replace('npy', 'npy_aug')
-            for file_path_augs in os.listdir(t_path_aug):
-                for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
-                    if file_path.split('_')[1] in t_valid_select_set:
-                        aug = os.path.join(file_path_augs, file_path)
-                        t_valid_list_aug.append(os.path.join(t_path_aug, aug))
-            t_valid_label_list_aug = []
-            for t in t_valid_list_aug:
-                parts = t.split('/')
-                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
-                new_parts = parts[:-2] + [parts[-1]]
-                new_parts[3] = 'label'
-                new_path = '/'.join(new_parts)
-                t_valid_label_list_aug.append(new_path)
+            # # valid 类似的处理
+            # t_valid_list_aug = []
+            # t_path_aug = t_path.replace('npy', 'npy_aug')
+            # for file_path_augs in os.listdir(t_path_aug):
+            #     for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
+            #         if file_path.split('_')[1] in t_valid_select_set:
+            #             aug = os.path.join(file_path_augs, file_path)
+            #             t_valid_list_aug.append(os.path.join(t_path_aug, aug))
+            # t_valid_label_list_aug = []
+            # for t in t_valid_list_aug:
+            #     parts = t.split('/')
+            #     # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+            #     new_parts = parts[:-2] + [parts[-1]]
+            #     new_parts[3] = 'label'
+            #     new_path = '/'.join(new_parts)
+            #     t_valid_label_list_aug.append(new_path)
             # 如果采用增强，则train 和 valid 要加入
+            # 测试的时候valid 不做增强
             t_train_list.extend(t_train_list_aug)
             t_train_label_list.extend(t_train_label_list_aug)
 
-            t_valid_list.extend(t_valid_list_aug)
-            t_valid_label_list.extend(t_valid_label_list_aug)
+            # t_valid_list.extend(t_valid_list_aug)
+            # t_valid_label_list.extend(t_valid_label_list_aug)
+        # 埋点2
+        end_time = time.time()  # 获取结束时间
+        print(f"aug 路径拼接运行时间: {end_time - start_time} 秒")
+        start_time = time.time()
+
 
         # 有oversampling的版本
         # oversampling 策略？
@@ -159,6 +167,10 @@ class Solver2(object):
             label_tv_dir=t_valid_label_list,
         )
 
+        # 埋点3
+        end_time = time.time()  # 获取结束时间
+        print(f"KflodDataloader数据加载运行时间: {end_time - start_time} 秒")
+        start_time = time.time()
         # --------------------------------------------------------------------------------------------------------- #
         # print("loading finished!")
 
@@ -209,11 +221,20 @@ class Solver2(object):
         y_pred = self.clf.predict(x_valid)
         print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
 
+        # 埋点4
+        end_time = time.time()  # 获取结束时间
+        print(f"参数部分valid数据加载运行时间: {end_time - start_time} 秒")
+        start_time = time.time()
+
         # 载入Dataloader
         self.train_dataset = generate_dataset(self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.batch_size, self.gpu)
         self.test_dataset = generate_dataset(self.xt_valid1, self.yt_valid1, self.xt_valid1, self.yt_valid1, self.batch_size, self.gpu)
         self.valid_dataset  =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
 
+        # 埋点5
+        end_time = time.time()  # 获取结束时间
+        print(f"载入dataloader数据运行时间: {end_time - start_time} 秒")
+        start_time = time.time()
 
     def train_and_valid(self):
         train_acc = []

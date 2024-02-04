@@ -19,7 +19,7 @@
   "early_stop_step": 15,
   "interval": 16,
   "mode": 0,
-  "aug": 0
+  "aug": 1
 }
 
 

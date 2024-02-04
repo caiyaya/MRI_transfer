@@ -12,7 +12,7 @@ import argparse
 from sklearn import svm
 from sklearn.metrics import accuracy_score
 from static_dataread.dataset_read import clf_data_loader
-
+import time
 
 # hyper-parameter
 parser = argparse.ArgumentParser("Number Transfer")
@@ -57,6 +57,9 @@ def main():
     # for (t_train_index, t_valid_index) in kf.split(t_path):
     t_ids = list(t_ids)
     for (t_train_index, t_valid_index) in kf.split(list(t_ids)):
+        # 埋点，测算代码耗时部分
+        start_time = time.time()
+
         print("-----------------------------------------")
         print("The "+str(mark)+"th ZHE experiment")
         print("Select target validset and testset（0.2）:", t_valid_index)
@@ -65,14 +68,23 @@ def main():
 
         # 提取train中id 对应的 参数信息
         # svm训练 参数信息
-
         x_train, y_train = clf_data_loader(extra, target, t_train_select)
         print("y_train:", y_train)
         clf = svm.SVC(kernel='poly', degree=3, probability=True)  # 使用线性核
         clf.fit(x_train, y_train)
 
+        # 埋点1
+        end_time = time.time()  # 获取结束时间
+        print(f"svm对于 train 部分的训练时间: {end_time - start_time} 秒")
+        start_time = time.time()
+
         solver = Solver2(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
                         config=config, clfModel=clf)
+
+        # 埋点10
+        end_time = time.time()  # 获取结束时间
+        print(f"Solver2准备时间: {end_time - start_time} 秒")
+
 
         solver.train_and_valid()
         solver.load_model()
