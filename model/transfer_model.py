@@ -578,6 +578,7 @@ def Generator(source, target):
         return mice2human.Feature()
 
 # =================================== domain_adversarial_Net ===================================
+# todo layer 层是否需要加参数进行调整
 class Domain_Adversarial_Net(nn.Module):
     def __init__(self):
         super(Domain_Adversarial_Net, self).__init__()

@@ -362,8 +362,8 @@ class Solver2(object):
             # print("--------target feature = ", xt_last)
 
             # ----------------------对齐损失------------------- #
-            # cmd = CMD()
-            # align_loss = cmd(xs_last, xt_last)
+            cmd = CMD()
+            align_loss = cmd(xs_feature, xt_last)
 
             # ----------------------对抗损失------------------- #
             # todo: 引入loss函数更新 + 加入互信息正则化项（类别敏感的正则化项）
@@ -393,7 +393,7 @@ class Solver2(object):
             total_adv_loss += adv_loss.item()
             total_batches += 1
 
-            loss = cls_loss + self.beta * adv_loss
+            loss = cls_loss + self.beta * adv_loss + align_loss
             # print("***********************************adv:", adv_loss)
             # -----------------分类+对齐---------------------- #
             # loss = cls_loss + self.alpha * align_loss

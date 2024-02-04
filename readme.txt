@@ -135,7 +135,7 @@ todo：（待补充）
     基于aug的：4mins*15*5 = 300 mins
         一个 epoch 中训练的时间: 234.85137271881104 秒
         一个 epoch 中valid的时间：0.21526050567626953
-    不基于aug的：
+    不基于aug的：0.5*15*5  = 37 mins
         一个 epoch 中训练的时间: 28.75791597366333 秒
         一个 epoch 中valid的时间：0.21965742111206055
 
@@ -143,11 +143,38 @@ todo：（待补充）
 框架已搭建，已fix advNet 预测为0的问题；具体策略待尝试
 
 3）参数优化调整、学习率、早停策略等
-修改学习率为1e-3，milestone为 5 和 10 epoch，早停策略设定为15个epoch valid acc没有改变
+修改学习率为1e-3，milestone为 5 和 10 epoch，早停策略设定为15个epoch
+valid acc loss 没有改变
 
 4）fix dataloader 加载aug数据集错误问题
 移除test中的数据增强；如需要测试增强，则需要改动整个dataloader方式，增加tta预测（代码改动较大）
 
+
+todo：
 5）dann框架中引入cdan
 
+6）dann layer 层增加 参数 控制 梯度回传
+
+7）对齐策略
+
+8) multi branch 多分支任务
+
+9）模型集成
+
+
+逻辑：
+    ecanet 特征提取器
+    1）svm传统的基于机器学习的分类器去做human的分类；
+    2）结合ecanet 和 mice信息，基于迁移学习 给一个dann的网络
+    3）1） + 2） 结合在一个模型框架当中 -- 》 xxxNet
+
+    「创新点：」
+            1）提出一个框架xxxNet
+            2）对抗损失loss 平方的 + 正则项
+            3）Net 本身的total_loss,  基于损失反馈的自适应调整策略
+            4) 模型集成 （投票 加权之类的融合策略）
+
+            5) 创新点？ -> dann 网络本身做一些创新？ 要有道理 有motivation
+
+    -> multi branch 多任务学习？ 为啥引入迁移学习
 
