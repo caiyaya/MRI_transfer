@@ -185,19 +185,29 @@ class Solver2(object):
         # 这里需要获取的x_test 和 y_test 是 符合 t_valid_select顺序的
         # 这里对应反了！！
         # valid1 对应test valid2 对应 valid
-        index = np.arange(valid_size/5)
-        spl = int(valid_size/5 * 0.5)
-        clf_t_test_select = [t_valid_select[int(i)] for i in index[:spl]]
-        clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
+        # index = np.arange(valid_size/5)
+        # spl = int(valid_size/5 * 0.5)
+        # clf_t_test_select = [t_valid_select[int(i)] for i in index[:spl]]
+        # clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
+        #
+        #
+        # x_valid, y_valid = clf_data_loader(extra, t_path, clf_t_valid_select)
+        #
+        # print("clf valid 测试：")
+        # y_pred = self.clf.predict(x_valid)
+        # print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+        # self.x_test, self.y_test = clf_data_loader(extra, t_path, clf_t_test_select)
 
-
-        x_valid, y_valid = clf_data_loader(extra, t_path, clf_t_valid_select)
+        x, y = clf_data_loader(extra, t_path, t_valid_select)
+        splitline = split
+        self.x_test = np.array([x[int(i)] for i in indices[:splitline]])
+        self.y_test = np.array([y[int(i)] for i in indices[:splitline]])
+        x_valid = [x[int(i)] for i in indices[splitline:]]
+        y_valid = [y[int(i)] for i in indices[splitline:]]
 
         print("clf valid 测试：")
         y_pred = self.clf.predict(x_valid)
         print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
-        self.x_test, self.y_test = clf_data_loader(extra, t_path, clf_t_test_select)
-
 
         # 载入Dataloader
         self.train_dataset = generate_dataset(self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.batch_size, self.gpu)
