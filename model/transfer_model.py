@@ -580,16 +580,14 @@ def Generator(source, target):
 # =================================== domain_adversarial_Net ===================================
 # todo layer 层是否需要加参数进行调整
 class Domain_Adversarial_Net(nn.Module):
-    def __init__(self):
+    def __init__(self, lambda_=0.01):
         super(Domain_Adversarial_Net, self).__init__()
+        self.grl = GradientReversal(lambda_)  # 创建GradientReversal实例
         self.fc_layer1 = nn.Sequential(nn.Linear(128, 64), nn.ReLU(inplace=False))
-        self.fc_layer2 = nn.Sequential(nn.Linear(64, 16), nn.ReLU(inplace=False))
-        self.fc_layer3 = nn.Sequential(nn.Linear(16, 2))
+        self.fc_layer2 = nn.Sequential(nn.Linear(64, 32), nn.ReLU(inplace=False))
+        self.fc_layer3 = nn.Sequential(nn.Linear(32, 16), nn.ReLU(inplace=False) )
+        self.fc_layer4 = nn.Sequential(nn.Linear(16, 2), nn.ReLU(inplace=False))
         self.apply(init_weights)
-        # self.fc_layer2 = nn.Sequential(nn.Linear(3072, 2048), nn.ReLU(inplace=False))
-        # self.fc_layer3 = nn.Sequential(nn.Linear(2048, 2))
-
-        self.initialize()
 
     def initialize(self):
         for m in self.modules():
@@ -597,13 +595,12 @@ class Domain_Adversarial_Net(nn.Module):
                 init.kaiming_normal_(m.weight)
 
     def forward(self, x):
-        grl = GradientReversal()
-        x = grl(x)
+        x = self.grl(x)
         # x = grad_reverse(x)
         x = self.fc_layer1(x)
         x = self.fc_layer2(x)
         x = self.fc_layer3(x)
-
+        x = self.fc_layer4(x)
         return x
 
 class Text_Domain_Adversarial_Net(nn.Module):
@@ -642,7 +639,8 @@ class GradientReversal(nn.Module):
     def __init__(self, lambda_ = 1):
         super(GradientReversal, self).__init__()
         self.lambda_ = lambda_
-
+    def update_lambda(self, new_lambda):
+        self.lambda_ = new_lambda
     def forward(self, x):
         return GradientReversalFunction.apply(x, self.lambda_)
 

@@ -251,7 +251,7 @@ class Solver2(object):
         self.da_Net = Domain_Adversarial_Net()
 
         # todo cdan分类器
-        # self.cdan_Net = CDAN_AdversarialNetwork()
+        self.cdan_Net = CDAN_AdversarialNetwork()
 
         # 类别分类器
         self.lb_Cls = Label_Classifier(inplane=self.feature_dim, class_num=self.class_num)
@@ -337,11 +337,12 @@ class Solver2(object):
         self.model_train()
         self.scheduler_step()
 
-        # 每轮打印 cls loss 和 adv loss 观察变化
+        # 每轮打印 align_loss、cls loss 和 adv loss 观察变化
         total_cls_loss = 0.0
         total_adv_loss = 0.0
+        total_align_loss = 0.0
         total_batches = 0
-
+        new_lambda_value = self.config.beta
         for step, train_data in enumerate(dataset):
             xs = train_data['S']
             xt = train_data['T']
@@ -391,9 +392,15 @@ class Solver2(object):
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
+            total_align_loss += align_loss.item()
             total_batches += 1
 
-            loss = cls_loss + self.beta * adv_loss + align_loss
+            # 依赖beta*损失函数 实现对抗和分类的调控
+            # loss = cls_loss + self.beta * adv_loss + align_loss
+            # 通过梯度回传 实现对抗和分类的调控 从0.01开始每次扩增1.5倍
+            loss = cls_loss +  adv_loss + align_loss
+            new_lambda_value = new_lambda_value*1.5
+            self.da_Net.grl.update_lambda(new_lambda_value)
             # print("***********************************adv:", adv_loss)
             # -----------------分类+对齐---------------------- #
             # loss = cls_loss + self.alpha * align_loss
@@ -439,11 +446,12 @@ class Solver2(object):
         # print("Loss_last.type = ", type(Loss_last))
         print('After Epoch ', epoch,  ' :')
         # 打印cls loss 和 adv loss
+        avg_align_loss = total_align_loss / total_batches
         avg_cls_loss = total_cls_loss / total_batches
         avg_adv_loss = total_adv_loss / total_batches
         print(
-            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}')
-        # 基于损失反馈的动态调整self.beta
+            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}, Average Align Loss：{avg_align_loss:.4f}')
+        # 基于损失反馈的动态调整self.beta self.alpha
         # 如何给定调整策略？
         # 设置阈值和调整因子
         threshold_increase = 2  # 当adv_loss是cls_loss的2倍时开始减少beta

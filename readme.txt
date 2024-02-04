@@ -154,6 +154,7 @@ todo：
 5）dann框架中引入cdan
 
 6）dann layer 层增加 参数 控制 梯度回传
+ 已实现 commit 
 
 7）对齐策略
 
