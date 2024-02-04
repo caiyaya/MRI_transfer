@@ -288,20 +288,6 @@ def return_dataset_train_2(data_name_list,label_name_list, modality, slice_size)
     width = data.shape[2]
     data = data.reshape((sample_num // modality, modality * height * width))  # 将数组整理成 病人*单张大切片的shape
 
-    # 每个模态五张
-    # for i in data_list:
-    #     d = np.load(i, allow_pickle=True)
-    #     for d_slice in range(d.shape[0]):
-    #         data.append(d[d_slice])
-    #         sample_num += 1  # 总切片张数
-    # data_npy = np.stack(data, axis=0)
-    #
-    # height = data.shape[1]
-    # width = data.shape[2]
-    # data_npy = data_npy.reshape((sample_num // modality, modality * height * width))  # 将数组整理成 病人*单张大切片的shape
-
-
-
     # 读取label.txt内的信息
     for i in label_list:
         with open(i, 'r') as f:

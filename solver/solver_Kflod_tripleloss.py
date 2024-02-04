@@ -249,6 +249,10 @@ class Solver2(object):
         self.fe_Net = eca_resnet20(in_channel=self.modality, modality=self.modality, out_channel=self.feature_dim, device = 'gpu')
         # 域对抗分类器
         self.da_Net = Domain_Adversarial_Net()
+
+        # todo cdan分类器
+        # self.cdan_Net = CDAN_AdversarialNetwork()
+
         # 类别分类器
         self.lb_Cls = Label_Classifier(inplane=self.feature_dim, class_num=self.class_num)
         if  self.gpu:
@@ -264,9 +268,22 @@ class Solver2(object):
         self.break_flag = False
         for epoch in range(self.epoch_num):
             self.curr_epoch = epoch
+
+            start_time = time.time()
+
             temp_acc1, temp_loss1 = self.train_process(epoch=epoch, dataset=self.train_dataset)
+
+            end_time = time.time()  # 获取结束时间
+            print(f"epoch 中训练的时间: {end_time - start_time} 秒")
+
             # temp_accT, temp_lossT = self.train_processT(epoch=epoch, dataset=self.valid_dataset)
+            start_time = time.time()
+
             temp_acc2, temp_loss2 = self.valid_process(epoch=epoch, dataset=self.valid_dataset)
+
+            end_time = time.time()  # 获取结束时间
+            print(f"epoch 中valide的时间: {end_time - start_time} 秒")
+
             # 如果当前验证集达到最好效果，则保存模型
             # is_greater = all(temp_acc2 > x for x in train_acc)
             # if is_greater:
@@ -438,8 +455,6 @@ class Solver2(object):
 
         # 保证beta在合理范围内
         self.beta = max(0.001, min(self.beta, 0.01))
-
-
 
         print('     [Train S] Acc: {a:.3f}, Loss: {l}'.format(a=Acc_last, l=Loss_last))
 
