@@ -153,10 +153,11 @@ valid acc loss 没有改变
 todo：
 5）dann框架中引入cdan
 
-6）dann layer 层增加 参数 控制 梯度回传
- 已实现 commit 
+6）dann layer 层增加 参数 控制 梯度回传 （参数需要调整，已实现回传调整框架）
+ 已实现 commit "使用梯度回传替代加权loss控制"
 
 7）对齐策略
+ 已实现 cmd align loss 貌似量级很大；不确定是否有用
 
 8) multi branch 多分支任务
 

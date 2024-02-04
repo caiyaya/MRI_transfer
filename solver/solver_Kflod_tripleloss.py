@@ -363,8 +363,8 @@ class Solver2(object):
             # print("--------target feature = ", xt_last)
 
             # ----------------------对齐损失------------------- #
-            cmd = CMD()
-            align_loss = cmd(xs_feature, xt_last)
+            # cmd = CMD()
+            # align_loss = cmd(xs_feature, xt_last)
 
             # ----------------------对抗损失------------------- #
             # todo: 引入loss函数更新 + 加入互信息正则化项（类别敏感的正则化项）
@@ -392,13 +392,13 @@ class Solver2(object):
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
-            total_align_loss += align_loss.item()
+            # total_align_loss += align_loss.item()
             total_batches += 1
 
             # 依赖beta*损失函数 实现对抗和分类的调控
             # loss = cls_loss + self.beta * adv_loss + align_loss
             # 通过梯度回传 实现对抗和分类的调控 从0.01开始每次扩增1.5倍
-            loss = cls_loss +  adv_loss + align_loss
+            loss = cls_loss +  adv_loss
             new_lambda_value = new_lambda_value*1.5
             self.da_Net.grl.update_lambda(new_lambda_value)
             # print("***********************************adv:", adv_loss)
