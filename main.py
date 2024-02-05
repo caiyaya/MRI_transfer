@@ -1,5 +1,6 @@
 # 五折交叉，测试
 from solver.solver_Kflod_tripleloss import *
+from solver.solver_Kflod_DCAN import *
 # 全部用来训练
 # from solver.HX_Kflod_train import *
 # 测试版
@@ -78,12 +79,17 @@ def main():
         print(f"svm对于 train 部分的训练时间: {end_time - start_time} 秒")
         start_time = time.time()
 
-        solver = Solver2(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
-                        config=config, clfModel=clf)
+        # solver = Solver2(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
+        #                 config=config, clfModel=clf)
+
+        # 使用cdAn的
+        solver = SolverCDAN(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select,
+                         t_valid_select=t_valid_select, model_save_path=model_save_path,
+                         config=config, clfModel=clf)
 
         # 埋点10
         end_time = time.time()  # 获取结束时间
-        print(f"Solver2准备时间: {end_time - start_time} 秒")
+        print(f"SolverCDAN准备时间: {end_time - start_time} 秒")
 
 
         solver.train_and_valid()

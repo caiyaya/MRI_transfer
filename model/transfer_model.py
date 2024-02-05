@@ -578,7 +578,6 @@ def Generator(source, target):
         return mice2human.Feature()
 
 # =================================== domain_adversarial_Net ===================================
-# todo layer 层是否需要加参数进行调整
 class Domain_Adversarial_Net(nn.Module):
     def __init__(self, lambda_=0.01):
         super(Domain_Adversarial_Net, self).__init__()
@@ -713,7 +712,7 @@ def init_weights(m):
 
 
 def calc_coeff(iter_num, high=1.0, low=0.0, alpha=10.0, max_iter=10000.0):
-    return np.float(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
+    return np.float64(2.0 * (high - low) / (1.0 + np.exp(-alpha*iter_num / max_iter)) - (high - low) + low)
 
 
 def grl_hook(coeff):

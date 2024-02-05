@@ -16,12 +16,14 @@ from loss import avd_loss
 from static_dataread.dataset_read import clf_data_loader
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
+from loss.cdan_loss import *
+
 
 plt.switch_backend('Agg')
 
 imgPath = "./caicaiImage/img"
 
-class Solver2(object):
+class SolverCDAN(object):
     def __init__(self,  mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
         self.config = config
         self.mark = mark # 交叉验证具体哪一折
@@ -64,6 +66,7 @@ class Solver2(object):
         self.da_Net = None  # 域对抗网络
         self.best_acc = 0
         self.break_flag = False
+
 
         # print(os.path.basename(__file__))
 
@@ -231,6 +234,14 @@ class Solver2(object):
         self.test_dataset = generate_dataset(self.xt_valid1, self.yt_valid1, self.xt_valid1, self.yt_valid1, self.batch_size, self.gpu)
         self.valid_dataset  =  generate_dataset(self.xt_valid2, self.yt_valid2, self.xt_valid2, self.yt_valid2, self.batch_size, self.gpu)
 
+        len_source = math.ceil(self.ys_train.shape[0] / self.batch_size)
+        len_target = math.ceil(self.yt_train.shape[0] / self.batch_size)
+        if len_source > len_target:
+            self.num_iter = len_source
+        else:
+            self.num_iter = len_target
+
+
         # 埋点5
         end_time = time.time()  # 获取结束时间
         print(f"载入dataloader数据运行时间: {end_time - start_time} 秒")
@@ -252,6 +263,7 @@ class Solver2(object):
 
         # todo cdan分类器
         self.cdan_Net = CDAN_AdversarialNetwork()
+        self.random_layer = RandomLayer([128, self.class_num], 128)
 
         # 类别分类器
         self.lb_Cls = Label_Classifier(inplane=self.feature_dim, class_num=self.class_num)
@@ -259,6 +271,8 @@ class Solver2(object):
             self.fe_Net.cuda()
             self.da_Net.cuda()
             self.lb_Cls.cuda()
+            self.cdan_Net.cuda()
+            self.random_layer.cuda()
         self.set_optimizer(which_opt=self.optimizer)
         self.set_scheduler(which_sch=self.scheduler)
 
@@ -337,10 +351,9 @@ class Solver2(object):
         self.model_train()
         self.scheduler_step()
 
-        # 每轮打印 align_loss、cls loss 和 adv loss 观察变化
+        # 每轮打印 cls loss 和 adv loss 观察变化
         total_cls_loss = 0.0
         total_adv_loss = 0.0
-        total_align_loss = 0.0
         total_batches = 0
         new_lambda_value = self.config.beta
         for step, train_data in enumerate(dataset):
@@ -360,85 +373,56 @@ class Solver2(object):
             xs_feature = self.fe_Net(xs)  # 得到的特征
             xt_last = self.fe_Net(xt)
 
+            # 引入条件分布对齐
+            xs_out = self.lb_Cls(xs_feature)
+            xt_out = self.lb_Cls(xt_last)
+            feature_out = torch.cat((xs_out, xt_out), 0)
+            softmax_output = nn.Softmax(dim=1)(feature_out)
+            domain_feature = torch.cat((xs_feature, xt_last), 0)
+            xs_shape = xs_out.shape[0]
+            xt_shape = xt_out.shape[0]
+            entropy = Entropy(softmax_output)
+
+            adv_loss = CDAN([domain_feature, softmax_output], [xs_shape, xt_shape], self.cdan_Net, entropy,
+                            calc_coeff(self.num_iter * epoch + step), self.random_layer)
+
             # print("--------source feature = ", xs_feature)
             # print("--------target feature = ", xt_last)
 
-            # ----------------------对齐损失------------------- #
-            # cmd = CMD()
-            # align_loss = cmd(xs_feature, xt_last)
 
             # ----------------------对抗损失------------------- #
-            # todo: 引入loss函数更新 + 加入互信息正则化项（类别敏感的正则化项）
-            xs_adv = self.da_Net(xs_feature)
-            xt_adv = self.da_Net(xt_last)
-            adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
+            # xs_adv = self.da_Net(xs_feature)
+            # xt_adv = self.da_Net(xt_last)
+            # adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
             # 平方对抗损失函数 + 类别敏感的正则化项（L2）
             # adv_loss = avd_loss.group_adv_loss_new(xs_adv, xt_adv)
 
-            # ----------------------三元组损失------------------- #
-            # margin = 0.2
-            # triple_fn = OnlineTripletLoss(margin, SemihardNegativeTripletSelector(margin)).cuda()
-            # # ------------------------------------------------- #
-            # ys_t = torch.t(ys)
-            # loss_fn = triple_fn(xs_feature, ys_t)
-            xs_out = self.lb_Cls(xs_feature)  # 分类结果
+
             # ----------------------交叉熵损失------------------- #
+            xs_out = self.lb_Cls(xs_feature)  # 分类结果
             cross_loss = nn.CrossEntropyLoss()
             cls_loss = cross_loss(xs_out, ys)
-            # ------------------------------------------------- #
 
-            # -----------------只有分类损失---------------------- #
-            # loss = cls_loss
             # -----------------分类+对抗---------------------- #
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
-            # total_align_loss += align_loss.item()
             total_batches += 1
 
             # 依赖beta*损失函数 实现对抗和分类的调控
             # loss = cls_loss + self.beta * adv_loss + align_loss
             # 通过梯度回传 实现对抗和分类的调控 从0.01开始每次扩增1.5倍
-            loss = cls_loss +  adv_loss
-            new_lambda_value = new_lambda_value*1.5
-            self.da_Net.grl.update_lambda(new_lambda_value)
-            # print("***********************************adv:", adv_loss)
-            # -----------------分类+对齐---------------------- #
-            # loss = cls_loss + self.alpha * align_loss
-            # print("***********************align:", align_loss)
-            # -----------------只有三元组损失---------------------- #
-            # loss = loss_fn
+            loss = cls_loss +  self.beta * adv_loss
+            # new_lambda_value = new_lambda_value*1.5
+            # self.da_Net.grl.update_lambda(new_lambda_value)
 
-            # -----------------分类+三元组损失---------------------- #
-            # loss = cls_loss + loss_fn
-
-            # if epoch >= 6:
-            #     loss = cls_loss + loss_fn
-            # else:
-            #     loss = loss_fn
-
-            # print("loss = ", loss)
-            # acc, sens, prec, f1 = accuracy(xs_out, ys, self.class_num, 0)
-            # ++++++++++++++++++++++++临时+++++++++++++++++++++++++ #
             acc = accuracy(xs_out, ys.cpu(), self.class_num, 0)
             Acc.append(acc)
             Loss.append(loss)
 
-            # Sens.append(sens)
-            # Prec.append(prec)
-            # F1.append(f1)
-
-            # if step % self.interval == 0:  # 每进行interval个样例训练之后输出一次[Train] Epoch
-            #     print('[Train] Epoch: {e}, Batch: {b}, Accuracy: {a:.3f}, Loss:{l:.3f}, '
-            #           .format(e=epoch, b=step, a=acc, l=loss))
 
             loss.backward()
-            # loss.backward(torch.ones_like(loss))  # 梯度反传
             self.optimizer_step()
-
-        # Acc_last, Loss_last, Sens_last, Prec_last, F1_last = synthesize(Acc, Loss, Sens, Prec, F1)
-        # print('[Train Result] Acc: {a:.3f}, Loss: {l:.3f}, Sens: {s:.3f}, Spec: {p:.3f}, F1: {f:.3f} '
-        #       .format(a=Acc_last, l=Loss_last, s=Sens_last, p=Prec_last, f=F1_last))
 
         Acc_last, Loss_last = synthesize(Acc, Loss)
         Loss_last = Loss_last.cpu()
@@ -447,11 +431,10 @@ class Solver2(object):
         # print("Loss_last.type = ", type(Loss_last))
         print('After Epoch ', epoch,  ' :')
         # 打印cls loss 和 adv loss
-        avg_align_loss = total_align_loss / total_batches
         avg_cls_loss = total_cls_loss / total_batches
         avg_adv_loss = total_adv_loss / total_batches
         print(
-            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}, Average Align Loss：{avg_align_loss:.4f}')
+            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}')
         # 基于损失反馈的动态调整self.beta self.alpha
         # 如何给定调整策略？
         # 设置阈值和调整因子

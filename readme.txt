@@ -152,17 +152,15 @@ valid acc loss 没有改变
 
 todo：
 5）dann框架中引入cdan
-
+    已实现 代码见solver Kflod DCAN commit "cadn框架"（维度已对齐，但是目测没啥效果提升，要自适应调整参数）
 6）dann layer 层增加 参数 控制 梯度回传 （参数需要调整，已实现回传调整框架）
- 已实现 commit "使用梯度回传替代加权loss控制"
-
+    已实现 commit "使用梯度回传替代加权loss控制"
 7）对齐策略
- 已实现 cmd align loss 貌似量级很大；不确定是否有用
-
+    已实现 cmd align loss 貌似量级很大；不确定是否有用
 8) multi branch 多分支任务
-
+    todo
 9）模型集成
-
+    todo
 
 逻辑：
     ecanet 特征提取器
