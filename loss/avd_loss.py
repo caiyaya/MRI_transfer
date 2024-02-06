@@ -29,6 +29,7 @@ def group_adv_loss_new(xs, xt, regularization_strength=0.1):
     # domain_y = F.one_hot(domain_y_ind, num_classes=2).float()
     # g_adv_loss = F.binary_cross_entropy_with_logits(domain_pred, domain_y)
     # 增加正则项，danet学习域不变特征，减少过拟合风险
+    # todo 其他计算方式
     # 正则项 为 计算源域和目标域特征之间均值差的L2范数
     mean_diff = torch.mean(xs, dim=0) - torch.mean(xt, dim=0)
     reg_loss = torch.norm(mean_diff, p=2)

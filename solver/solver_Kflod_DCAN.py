@@ -60,7 +60,7 @@ class SolverCDAN(object):
         self.feature_dim = config.feature_dim
 
         # 在迭代中赋值，不需要传参的参数
-        self.clf = clfModel
+        self.clf = clfModel # 集成的机器学习分类器
         self.fe_Net = None  # 特征提取器框架
         self.lb_Cls = None  # 分类器框架
         self.da_Net = None  # 域对抗网络
@@ -127,34 +127,14 @@ class SolverCDAN(object):
                 new_path = '/'.join(new_parts)
                 t_train_label_list_aug.append(new_path)
 
-            # # valid 类似的处理
-            # t_valid_list_aug = []
-            # t_path_aug = t_path.replace('npy', 'npy_aug')
-            # for file_path_augs in os.listdir(t_path_aug):
-            #     for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
-            #         if file_path.split('_')[1] in t_valid_select_set:
-            #             aug = os.path.join(file_path_augs, file_path)
-            #             t_valid_list_aug.append(os.path.join(t_path_aug, aug))
-            # t_valid_label_list_aug = []
-            # for t in t_valid_list_aug:
-            #     parts = t.split('/')
-            #     # 将'npy_aug'替换为'label'，并移除倒数第二个部分
-            #     new_parts = parts[:-2] + [parts[-1]]
-            #     new_parts[3] = 'label'
-            #     new_path = '/'.join(new_parts)
-            #     t_valid_label_list_aug.append(new_path)
-            # 如果采用增强，则train 和 valid 要加入
             # 测试的时候valid 不做增强
             t_train_list.extend(t_train_list_aug)
             t_train_label_list.extend(t_train_label_list_aug)
 
-            # t_valid_list.extend(t_valid_list_aug)
-            # t_valid_label_list.extend(t_valid_label_list_aug)
         # 埋点2
         end_time = time.time()  # 获取结束时间
         print(f"aug 路径拼接运行时间: {end_time - start_time} 秒")
         start_time = time.time()
-
 
         # 有oversampling的版本
         # oversampling 策略？
@@ -221,8 +201,22 @@ class SolverCDAN(object):
         y_valid = [y[int(i)] for i in indices[splitline:]]
 
         print("clf valid 测试：")
-        y_pred = self.clf.predict(x_valid)
-        print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+        for clf in self.clf:
+            y_pred_proba = clf.predict_proba(x_valid)
+
+            # 选择概率最高的类别作为预测类别
+            y_pred = y_pred_proba.argmax(axis=1)
+
+            # 打印每个分类器的名称（如果分类器没有名称属性，这里可能需要修改）
+            print(f"\n分类器：{clf.__class__.__name__}")
+            print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+
+            # 打印 y_pred 和 y_valid
+            print("y_pred:", y_pred)
+            print("y_valid:", y_valid)
+            print("y_prob:", y_pred_proba)
+
+
 
         # 埋点4
         end_time = time.time()  # 获取结束时间
@@ -259,7 +253,7 @@ class SolverCDAN(object):
         # 特征提取器
         self.fe_Net = eca_resnet20(in_channel=self.modality, modality=self.modality, out_channel=self.feature_dim, device = 'gpu')
         # 域对抗分类器
-        self.da_Net = Domain_Adversarial_Net()
+        # self.da_Net = Domain_Adversarial_Net()
 
         # todo cdan分类器
         self.cdan_Net = CDAN_AdversarialNetwork()
@@ -269,7 +263,6 @@ class SolverCDAN(object):
         self.lb_Cls = Label_Classifier(inplane=self.feature_dim, class_num=self.class_num)
         if  self.gpu:
             self.fe_Net.cuda()
-            self.da_Net.cuda()
             self.lb_Cls.cuda()
             self.cdan_Net.cuda()
             self.random_layer.cuda()
@@ -362,7 +355,6 @@ class SolverCDAN(object):
             ys = train_data['S_label']
             # print("xs.shape = ", xs.shape)
 
-
             if self.gpu:
                 xs = xs.cuda()
                 xt = xt.cuda()
@@ -412,7 +404,7 @@ class SolverCDAN(object):
             # 依赖beta*损失函数 实现对抗和分类的调控
             # loss = cls_loss + self.beta * adv_loss + align_loss
             # 通过梯度回传 实现对抗和分类的调控 从0.01开始每次扩增1.5倍
-            loss = cls_loss +  self.beta * adv_loss
+            loss = cls_loss +  adv_loss
             # new_lambda_value = new_lambda_value*1.5
             # self.da_Net.grl.update_lambda(new_lambda_value)
 
@@ -700,7 +692,7 @@ class SolverCDAN(object):
                                          lr=self.lr,
                                          weight_decay=self.weight_decay)
 
-            self.opt_da_Net = optim.Adam(self.da_Net.parameters(),
+            self.opt_cdan_Net = optim.Adam(self.cdan_Net.parameters(),
                                          lr=self.lr,
                                          weight_decay=self.weight_decay)
 
@@ -716,9 +708,11 @@ class SolverCDAN(object):
         elif which_sch == 'multi_step':
             self.sch_fe_Net = optim.lr_scheduler.MultiStepLR(self.opt_fe_Net, milestones=[5, 10])
             self.sch_lb_Cls = optim.lr_scheduler.MultiStepLR(self.opt_lb_Cls, milestones=[5, 10])
+            self.sch_cdan_Net = optim.lr_scheduler.MultiStepLR(self.opt_cdan_Net, milestones=[5, 10])
 
     def reset_grad(self):
         self.opt_fe_Net.zero_grad()
+        self.opt_cdan_Net.zero_grad()
         self.opt_lb_Cls.zero_grad()
 
     def optimizer_step(self):
@@ -726,16 +720,18 @@ class SolverCDAN(object):
         执行优化
         """
         self.opt_fe_Net.step()
+        self.opt_cdan_Net.step()
         self.opt_lb_Cls.step()
 
     def scheduler_step(self):
         self.sch_fe_Net.step()
+        self.sch_cdan_Net.step()
         self.sch_lb_Cls.step()
 
     def model_train(self):
         # 启用 BatchNormalization 和 Dropout
         self.fe_Net.train()
-        self.da_Net.train()
+        self.cdan_Net.train()
         self.lb_Cls.train()
 
     def model_eval(self):
@@ -744,7 +740,7 @@ class SolverCDAN(object):
         不会取平均，而是用训练好的值，不然的话，一旦 stest的 batch_size过小，很容易就会被 BN层影响结果。
         """
         self.fe_Net.eval()
-        self.da_Net.eval()
+        self.cdan_Net.eval()
         self.lb_Cls.eval()
 
     def save_model(self, acc):
@@ -763,17 +759,17 @@ class SolverCDAN(object):
             os.makedirs(file_name)
 
         torch.save(self.fe_Net.state_dict(), os.path.join(file_name, "fe_Net.pkl"))
-        # torch.save(self.da_Net.state_dict(), './model_log/da_Net.pkl')
+        torch.save(self.cdan_Net.state_dict(),  os.path.join(file_name, "cdan_Net.pkl"))
         torch.save(self.lb_Cls.state_dict(), os.path.join(file_name, "lb_Cls.pkl"))
 
     def load_model(self):
         print("Loading Model……")
         self.fe_Net = eca_resnet20(in_channel=self.modality, modality=self.modality, out_channel=self.feature_dim, device = 'gpu')  # 特征提取器
-        # self.da_Net = Domain_Adversarial_Net()
+        self.cdan_Net = CDAN_AdversarialNetwork()
         self.lb_Cls = Label_Classifier(inplane=self.feature_dim, class_num=self.class_num)
         if self.gpu:
             self.fe_Net.cuda()
-            # self.da_Net.cuda()
+            self.cdan_Net.cuda()
             self.lb_Cls.cuda()
         best_acc = 0
         for file in os.listdir(self.model_save_path):
@@ -787,7 +783,8 @@ class SolverCDAN(object):
         read_path = os.path.join(self.model_save_path, best_result)
         fea_path = os.path.join(read_path, "fe_Net.pkl")
         cls_path = os.path.join(read_path, "lb_Cls.pkl")
+        cdan_path = os.path.join(read_path, "cdan_Net.pkl")
         self.fe_Net.load_state_dict(torch.load(fea_path))
-        # self.da_Net.load_state_dict(torch.load('./model_log/da_Net.pkl'))
+        self.cdan_Net.load_state_dict(torch.load(cdan_path))
         self.lb_Cls.load_state_dict(torch.load(cls_path))
         print("Model Load Finish ! ✿ヽ(°▽°)ノ✿")

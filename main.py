@@ -15,13 +15,19 @@ from sklearn.metrics import accuracy_score
 from static_dataread.dataset_read import clf_data_loader
 import time
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+
 # hyper-parameter
 parser = argparse.ArgumentParser("Number Transfer")
 parser.add_argument('-c', '--config', default='./configs/number_config.json')
 args = parser.parse_args()
 config = process_config(args.config)
 # 设置随机种子
-np.random.seed(1024)
+np.random.seed(45)
 
 
 def main():
@@ -41,6 +47,8 @@ def main():
     t_ids = set()
     for file_path in os.listdir(target):
         t_ids.add(file_path.split('_')[1])
+        # # # 这里增加判断，看需要五折中的哪几折
+        # if(file_path.split('_')[2] == "2"):
         t_path.append(os.path.join(target, file_path))
 
     # 如果需要使用aug数据
@@ -69,10 +77,20 @@ def main():
 
         # 提取train中id 对应的 参数信息
         # svm训练 参数信息
+        # 引入更多的分类器
         x_train, y_train = clf_data_loader(extra, target, t_train_select)
         print("y_train:", y_train)
-        clf = svm.SVC(kernel='poly', degree=3, probability=True)  # 使用线性核
-        clf.fit(x_train, y_train)
+        clf_svm = svm.SVC(kernel='poly', degree=3, probability=True)
+        clf_lr = LogisticRegression()
+        clf_dt = DecisionTreeClassifier()
+        clf_rf = RandomForestClassifier()
+        clf_gb = GradientBoostingClassifier()
+        clf_knn = KNeighborsClassifier(n_neighbors=2)
+        clf_nb = GaussianNB()
+        clf = [clf_svm, clf_lr, clf_dt, clf_rf, clf_gb, clf_knn, clf_nb]
+
+        for clf_item in clf:
+            clf_item.fit(x_train, y_train)
 
         # 埋点1
         end_time = time.time()  # 获取结束时间

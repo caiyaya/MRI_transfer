@@ -14,9 +14,9 @@
   "scheduler": "multi_step",
   "learning_rate": 1e-3,
   "momentum": 0.99,
-  "weight_decay": 1e-3,
+  "weight_decay": 1e-4,
   "check_epoch": 12,
-  "early_stop_step": 15,
+  "early_stop_step": 5,
   "interval": 16,
   "mode": 0,
   "aug": 0

@@ -4,6 +4,7 @@ from static_dataread.usps import load_usps
 from static_dataread.unaligned_data_loader import UnalignedDataLoader
 import os
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 def clf_data_loader(extra, target, t_train_select):
     """
     准备训练数据和标签。
@@ -45,9 +46,14 @@ def clf_data_loader(extra, target, t_train_select):
             y_train.append(label)
 
     x_train = np.array(x_train)
+    x_train_4 =np.delete(x_train, [1, 3], axis=1)
     y_train = np.array(y_train)
 
-    return x_train, y_train
+    # 标准化处理
+    scaler = StandardScaler()
+    x_train_scaled = scaler.fit_transform(x_train_4)
+
+    return x_train_scaled, y_train
 
 
 def return_dataset(domain_name, usps, scale, all_use):
