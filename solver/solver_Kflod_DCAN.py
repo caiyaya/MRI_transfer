@@ -201,14 +201,14 @@ class SolverCDAN(object):
         y_valid = [y[int(i)] for i in indices[splitline:]]
 
         print("clf valid 测试：")
-        for clf in self.clf:
-            y_pred_proba = clf.predict_proba(x_valid)
+        for clf_name, clf_item in self.clf.items():
+            y_pred_proba = clf_item.predict_proba(x_valid)
 
             # 选择概率最高的类别作为预测类别
             y_pred = y_pred_proba.argmax(axis=1)
 
             # 打印每个分类器的名称（如果分类器没有名称属性，这里可能需要修改）
-            print(f"\n分类器：{clf.__class__.__name__}")
+            print(f"\n分类器：{clf_name}")
             print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
 
             # 打印 y_pred 和 y_valid
@@ -347,6 +347,7 @@ class SolverCDAN(object):
         # 每轮打印 cls loss 和 adv loss 观察变化
         total_cls_loss = 0.0
         total_adv_loss = 0.0
+        total_align_loss = 0.0
         total_batches = 0
         new_lambda_value = self.config.beta
         for step, train_data in enumerate(dataset):
@@ -389,6 +390,9 @@ class SolverCDAN(object):
             # 平方对抗损失函数 + 类别敏感的正则化项（L2）
             # adv_loss = avd_loss.group_adv_loss_new(xs_adv, xt_adv)
 
+            # ----------------------对齐损失------------------- #
+            cmd = CMD()
+            align_loss = cmd(xs_feature, xt_last)
 
             # ----------------------交叉熵损失------------------- #
             xs_out = self.lb_Cls(xs_feature)  # 分类结果
@@ -399,14 +403,13 @@ class SolverCDAN(object):
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
+            total_align_loss += align_loss.item()
             total_batches += 1
 
             # 依赖beta*损失函数 实现对抗和分类的调控
             # loss = cls_loss + self.beta * adv_loss + align_loss
-            # 通过梯度回传 实现对抗和分类的调控 从0.01开始每次扩增1.5倍
-            loss = cls_loss +  adv_loss
-            # new_lambda_value = new_lambda_value*1.5
-            # self.da_Net.grl.update_lambda(new_lambda_value)
+            loss = cls_loss +  adv_loss +  align_loss
+
 
             acc = accuracy(xs_out, ys.cpu(), self.class_num, 0)
             Acc.append(acc)
@@ -425,8 +428,9 @@ class SolverCDAN(object):
         # 打印cls loss 和 adv loss
         avg_cls_loss = total_cls_loss / total_batches
         avg_adv_loss = total_adv_loss / total_batches
+        avg_align_loss = total_align_loss / total_batches
         print(
-            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}')
+            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}， Average Align Loss: {avg_align_loss:.4f}')
         # 基于损失反馈的动态调整self.beta self.alpha
         # 如何给定调整策略？
         # 设置阈值和调整因子
@@ -560,13 +564,20 @@ class SolverCDAN(object):
         for step, data in enumerate(dataset):
             # 引入 self clf
             bs = self.config.batch_size
+            resDict = {}
+            # for clf_name, clf_item in self.clf.items():
+
             if step*bs+bs < len(self.x_test):
-                x_svm = self.clf.predict_proba(self.x_test[step*bs: step*bs+bs, :])
+                for clf_name, clf_item in self.clf.items():
+                    resDict[clf_name] = clf_item.predict_proba(self.x_test[step*bs: step*bs+bs, :])
             else:
                 if self.x_test[step * bs:].shape[0] > 0:
-                    x_svm = self.clf.predict_proba(self.x_test[step * bs:, :])
+                    for clf_name, clf_item in self.clf.items():
+                        resDict[clf_name] = clf_item.predict_proba(self.x_test[step * bs:, :])
                 else:
                     continue
+
+
             xt = data['T']
             yt = data['T_label']
             if self.gpu:
@@ -586,7 +597,7 @@ class SolverCDAN(object):
                 cls_loss = cross_loss(xt_out, yt)
                 loss = cls_loss
                 # acc, Sens, Prec, F1 = accuracy(xt_out, yt, self.class_num, 0)
-                acc = accuracy1(torch.tensor(x_svm).cuda(), xt_out, yt, self.class_num, 0)
+                acc = accuracy1(resDict, xt_out, yt, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
 

@@ -59,6 +59,16 @@ def main():
                 file_path = os.path.join(file_augs, file_path)
                 s_path.append(os.path.join(source_aug, file_path))
 
+    # 创建分类器
+    clf = {
+        'svm': svm.SVC(kernel='poly', degree=3, probability=True),
+        'lr': LogisticRegression(),
+        'dt': DecisionTreeClassifier(),
+        'rf': RandomForestClassifier(),
+        'gb': GradientBoostingClassifier(),
+        'knn': KNeighborsClassifier(n_neighbors=4),
+        'nb': GaussianNB(),
+    }
 
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
     mark = 1
@@ -80,16 +90,8 @@ def main():
         # 引入更多的分类器
         x_train, y_train = clf_data_loader(extra, target, t_train_select)
         print("y_train:", y_train)
-        clf_svm = svm.SVC(kernel='poly', degree=3, probability=True)
-        clf_lr = LogisticRegression()
-        clf_dt = DecisionTreeClassifier()
-        clf_rf = RandomForestClassifier()
-        clf_gb = GradientBoostingClassifier()
-        clf_knn = KNeighborsClassifier(n_neighbors=2)
-        clf_nb = GaussianNB()
-        clf = [clf_svm, clf_lr, clf_dt, clf_rf, clf_gb, clf_knn, clf_nb]
 
-        for clf_item in clf:
+        for clf_name, clf_item in clf.items():
             clf_item.fit(x_train, y_train)
 
         # 埋点1
