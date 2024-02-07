@@ -20,9 +20,9 @@
   "interval": 16,
   "mode": 0,
   "aug": 0,
-  "thr": 0.4,
-  "test_save": 0,
-  "searchSeed": 1,
+  "thr": 0.0,
+  "test_save": 1,
+  "searchSeed": 0,
   "seed": 7,
   "acc": 0.0
 }

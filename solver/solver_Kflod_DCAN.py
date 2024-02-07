@@ -515,9 +515,18 @@ class SolverCDAN(object):
             # print("--------target feature = ", xt_last)
 
             # ----------------------对齐损失------------------- #
-            # todo 可尝试引入新的
-            cmd = CMD()
-            align_loss = cmd(xs_feature, xt_last)
+            # 尝试引入新的 mcc loss
+            target_softmax_out_temp = nn.Softmax(dim=1)(xt_out)
+            target_entropy_weight = Entropy(target_softmax_out_temp).detach()
+            target_entropy_weight = 1 + torch.exp(-target_entropy_weight)
+            target_entropy_weight = self.config.batch_size * target_entropy_weight / torch.sum(target_entropy_weight)
+            cov_matrix_t = target_softmax_out_temp.mul(target_entropy_weight.view(-1, 1)).transpose(1, 0).mm(
+                target_softmax_out_temp)
+            cov_matrix_t = cov_matrix_t / torch.sum(cov_matrix_t, dim=1)
+            mcc_loss = (torch.sum(cov_matrix_t) - torch.trace(cov_matrix_t)) / self.config.batch_size
+            align_loss = mcc_loss
+            # cmd = CMD()
+            # align_loss = cmd(xs_feature, xt_last)
 
             # ----------------------交叉熵损失------------------- #
             xs_out = self.lb_Cls(xs_feature)  # 分类结果
