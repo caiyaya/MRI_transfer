@@ -47,14 +47,14 @@ def clf_data_loader(extra, target, t_train_select):
 
     x_train = np.array(x_train)
     # 删除 mri 和 f 列
-    x_train_4 =np.delete(x_train, [1, 3], axis=1)
+    # x_train_4 =np.delete(x_train, [1, 3], axis=1)
     y_train = np.array(y_train)
 
     # 标准化处理
     # scaler = StandardScaler()
     # x_train_scaled = scaler.fit_transform(x_train_4)
 
-    return x_train_4, y_train
+    return x_train, y_train
 
 
 def return_dataset(domain_name, usps, scale, all_use):

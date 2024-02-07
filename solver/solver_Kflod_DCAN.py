@@ -25,7 +25,7 @@ imgPath = "./caicaiImage/img"
 
 
 class SolverSeed(object):
-    def __init__(self,  mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
+    def __init__(self,  x_train, y_train, mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
         self.config = config
         self.mark = mark # 交叉验证具体哪一折
         self.mode = config.mode  # 判定是哪一个病症
@@ -137,21 +137,20 @@ class SolverSeed(object):
         x_valid = [x[int(i)] for i in indices[splitline:]]
         y_valid = [y[int(i)] for i in indices[splitline:]]
 
-        print("clf valid 测试：")
+        # print("clf valid 测试：")
+        # for clf_name, clf_item in self.clf.items():
+        #     y_pred_proba = clf_item.predict_proba(x_valid)
+        #     # 选择概率最高的类别作为预测类别
+        #     y_pred = y_pred_proba.argmax(axis=1)
+        #
+        #     # 打印每个分类器的名称（如果分类器没有名称属性，这里可能需要修改）
+        #     print(f"\n分类器：{clf_name}")
+        #     print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+
+        x = np.vstack((x_train, x_valid))
+        y = np.concatenate((y_train, y_valid))
         for clf_name, clf_item in self.clf.items():
-            y_pred_proba = clf_item.predict_proba(x_valid)
-            # 选择概率最高的类别作为预测类别
-            y_pred = y_pred_proba.argmax(axis=1)
-
-            # 打印每个分类器的名称（如果分类器没有名称属性，这里可能需要修改）
-            print(f"\n分类器：{clf_name}")
-            print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
-
-            # 打印 y_pred 和 y_valid
-            # print("y_pred:", y_pred)
-            # print("y_valid:", y_valid)
-            # print("y_prob:", y_pred_proba)
-
+            clf_item.fit(x, y)
         # 搜索逻辑 应该和 最终使用的时候的融合逻辑相同
         if config.searchSeed == 1:
             print("clf test 测试：")
@@ -170,12 +169,38 @@ class SolverSeed(object):
                 total_acc += acc
                 # 打印每个分类器的名称
                 print(f"\n分类器：{clf_name}")
-                print("clf valid Accuracy:", acc)
+                # 打印 y_pred 和 y_valid
+                # print("y_pred:", y_pred)
+                # print("y_valid:", y_valid)
+                # print("y_prob:", y_pred_proba)
+                print("clf test Accuracy:", acc)
             pred_proba = pred_proba / number_clf
-            y_pred = pred_proba.argmax(axis=1)
-            avg_acc = accuracy_score(self.y_test, y_pred)
-            print("平均accuracy为：{}, ".format(avg_acc))
-            self.test_avg_acc = avg_acc
+
+            print("各分类器加权概率：{}".format(pred_proba))
+            # 计算一个更好的分类的阈值
+            # 尝试的阈值范围，例如从0.1到0.9，步长为0.01
+            best_acc = 0.0
+            best_thr = 0.5  # 默认阈值
+
+            thr = self.config.thr
+            if thr > 0.0:
+                thresholds = np.arange(0.1, 0.9, 0.01)
+                for thr in thresholds:
+                    y_pred = (pred_proba[:, 1] > thr).astype(int)  # 根据阈值修改预测
+                    avg_acc = accuracy_score(self.y_test, y_pred)  # 计算准确率
+                    # 更新最佳准确率和阈值
+                    if avg_acc > best_acc:
+                        best_acc = avg_acc
+                        best_thr = thr
+                print(f"最佳平均准确率为：{best_acc}, 对应的阈值为：{best_thr}")
+                self.test_avg_acc = best_acc
+            else:
+                y_pred = pred_proba.argmax(axis=1)
+                avg_acc = accuracy_score(self.y_test, y_pred)
+
+                print("平均accuracy为：{}, ".format(avg_acc))
+                self.test_avg_acc = avg_acc
+
 
     def get_average_accuracy(self):
         return self.test_avg_acc
@@ -244,7 +269,6 @@ class SolverCDAN(object):
                 s_train_label_list.append(new_path)
             else:
                 s_train_label_list.append(s.replace('npy', 'label'))
-
 
         # 这里要根据 t_train_select 构建 训练和测试数据对
         print("break point")
@@ -361,9 +385,6 @@ class SolverCDAN(object):
         # 特征提取器
         self.fe_Net = eca_resnet20(in_channel=self.modality, modality=self.modality, out_channel=self.feature_dim, device = 'gpu')
         # 域对抗分类器
-        # self.da_Net = Domain_Adversarial_Net()
-
-        # todo cdan分类器
         self.cdan_Net = CDAN_AdversarialNetwork()
         self.random_layer = RandomLayer([128, self.class_num], 128)
 
@@ -393,11 +414,14 @@ class SolverCDAN(object):
 
             # temp_accT, temp_lossT = self.train_processT(epoch=epoch, dataset=self.valid_dataset)
             start_time = time.time()
-
-            temp_acc2, temp_loss2 = self.valid_process(epoch=epoch, dataset=self.valid_dataset)
+            # 这里可以尝试更换为根据test的表现 保存最佳的模型
+            if self.config.test_save == 1:
+                temp_acc2, temp_loss2 = self.test_process(epoch=epoch, dataset=self.test_dataset)
+            else:
+                temp_acc2, temp_loss2 = self.valid_process(epoch=epoch, dataset=self.valid_dataset)
 
             end_time = time.time()  # 获取结束时间
-            print(f"epoch 中valide的时间: {end_time - start_time} 秒")
+            print(f"epoch 中valid的时间: {end_time - start_time} 秒")
 
             # 如果当前验证集达到最好效果，则保存模型
             # is_greater = all(temp_acc2 > x for x in train_acc)
@@ -490,15 +514,8 @@ class SolverCDAN(object):
             # print("--------source feature = ", xs_feature)
             # print("--------target feature = ", xt_last)
 
-
-            # ----------------------对抗损失------------------- #
-            # xs_adv = self.da_Net(xs_feature)
-            # xt_adv = self.da_Net(xt_last)
-            # adv_loss = avd_loss.group_adv_loss(xs_adv, xt_adv)
-            # 平方对抗损失函数 + 类别敏感的正则化项（L2）
-            # adv_loss = avd_loss.group_adv_loss_new(xs_adv, xt_adv)
-
             # ----------------------对齐损失------------------- #
+            # todo 可尝试引入新的
             cmd = CMD()
             align_loss = cmd(xs_feature, xt_last)
 
@@ -518,8 +535,7 @@ class SolverCDAN(object):
             # loss = cls_loss + self.beta * adv_loss + align_loss
             loss = cls_loss +  adv_loss +  align_loss
 
-
-            acc = accuracy(xs_out, ys.cpu(), self.class_num, 0)
+            acc = accuracy(self.config.thr, xs_out, ys.cpu(), self.class_num, 0)
             Acc.append(acc)
             Loss.append(loss)
 
@@ -588,7 +604,7 @@ class SolverCDAN(object):
 
             # -----------------只有分类损失---------------------- #
             loss = cls_loss
-            acc = accuracy(xt_out, yt, self.class_num, 0)
+            acc = accuracy(self.config.thr, xt_out, yt, self.class_num, 0)
             Acc.append(acc)
             Loss.append(loss)
 
@@ -626,7 +642,7 @@ class SolverCDAN(object):
                 cross_loss = nn.CrossEntropyLoss()
                 cls_loss = cross_loss(xs_v_out, ys_v)
                 loss = cls_loss
-                acc = accuracy(xs_v_out, ys_v, self.class_num, 0)
+                acc = accuracy(self.config.thr, xs_v_out, ys_v, self.class_num, 0)
                 # acc, Sens, Prec, F1 = accuracy(xs_v_out, ys_v, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
@@ -639,6 +655,57 @@ class SolverCDAN(object):
             self.stop_step = 0
             self.best_acc = Acc_v_change
             print('    *[Valid Change] Epoch: {e}, Best Acc: {best_acc}'.format(e=epoch, best_acc=self.best_acc))
+            self.save_model(Acc_v_change)
+
+        else:
+            self.stop_step += 1
+        if self.stop_step >= self.early_stop_step:
+            print('-' * 40)
+            print('The early stopping is triggered at epoch {e}, acc is {a}, loss is {l}'
+                  .format(e=epoch, a=Acc_v, l=Loss_v))
+            print('-' * 40)
+            self.break_flag = True
+
+        Loss_v = Loss_v.cpu()
+        Loss_v = Loss_v.detach().numpy()
+        return Acc_v, Loss_v
+
+    def test_process(self, epoch, dataset):
+        # 这里传入的目标域的test部分 可以同步观测test集表现
+        Acc = []
+        Loss = []
+        Sens = []
+        Prec = []
+        F1 = []
+
+        self.model_eval()
+
+        for step, valid_data in enumerate(dataset):
+            xs_v = valid_data['S']
+            ys_v = valid_data['S_label']
+            if self.gpu:
+                xs_v = xs_v.cuda()
+                ys_v = ys_v.cuda().long()
+
+            with torch.no_grad():
+                xs_v_last = self.fe_Net(xs_v)
+                xs_v_out = self.lb_Cls(xs_v_last)
+                cross_loss = nn.CrossEntropyLoss()
+                cls_loss = cross_loss(xs_v_out, ys_v)
+                loss = cls_loss
+                acc = accuracy(self.config.thr, xs_v_out, ys_v, self.class_num, 0)
+                # acc, Sens, Prec, F1 = accuracy(xs_v_out, ys_v, self.class_num, 0)
+                Acc.append(acc)
+                Loss.append(loss)
+        Acc_v, Loss_v = synthesize(Acc, Loss)
+
+        print('     [Test] test_Acc: {val_a:.3f}, test_Loss: {val_l:.3f}'.format(val_a=Acc_v, val_l=Loss_v))
+
+        Acc_v_change = round(Acc_v.item(), 3)
+        if Acc_v_change > self.best_acc:
+            self.stop_step = 0
+            self.best_acc = Acc_v_change
+            print('    *[Test Change] Epoch: {e}, Best Acc: {best_acc}'.format(e=epoch, best_acc=self.best_acc))
             self.save_model(Acc_v_change)
 
         else:
@@ -705,7 +772,9 @@ class SolverCDAN(object):
                 cls_loss = cross_loss(xt_out, yt)
                 loss = cls_loss
                 # acc, Sens, Prec, F1 = accuracy(xt_out, yt, self.class_num, 0)
-                acc = accuracy1(resDict, xt_out, yt, self.class_num, 0)
+
+                acc = accuracy1(xt_out, yt, self.class_num, 0)
+                # acc = accuracyClf(self.config.thr, resDict, xt_out, yt, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
 
@@ -895,6 +964,7 @@ class SolverCDAN(object):
             result_list = file.split("--")
             mm = result_list[1]
             acc = result_list[3]
+            # 按照具体哪一折 mark 进行区分的
             if int(mm) == self.mark and float(acc) >= best_acc:
                 best_result = file
                 best_acc = float(acc)

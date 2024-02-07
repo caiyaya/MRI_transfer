@@ -192,10 +192,14 @@ def plot_confusion_matrix(cm, classes,
     plt.close('all')  # 关闭图
 
 
-def accuracy(x_out, y_true, classes, isPlot, save_tag=''):
+def accuracy(thr, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
-    y_pred = torch.argmax(x_pro, dim=1)
+    # 更改阈值
+    if thr > 0.0:
+        y_pred = (x_pro[:, 1] > thr).long()
+    else:
+        y_pred = torch.argmax(x_pro, dim=1)
 
     # 计算混淆矩阵
     y = np.zeros(len(y_true))
@@ -219,7 +223,7 @@ def accuracy(x_out, y_true, classes, isPlot, save_tag=''):
     # F1 = f1_score(y, y_, average='weighted')
     return Acc # , Sens, Prec, F1 #, cnf_mat
 
-def accuracy1(resDict, x_out, y_true, classes, isPlot, save_tag=''):
+def accuracyClf(thr, resDict, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
 
@@ -228,7 +232,55 @@ def accuracy1(resDict, x_out, y_true, classes, isPlot, save_tag=''):
         res = torch.tensor(res).cuda()
         print("{}:".format(name), res)
         x_fuse = (res + x_pro) / 2
-    y_pred = torch.argmax(x_fuse, dim=1)
+
+    if thr > 0.0:
+        y_pred = (x_fuse[:, 1] > thr).long()
+    else:
+        y_pred = torch.argmax(x_fuse, dim=1)
+
+    print("x_pro:", x_pro)
+    print("y_true:", y_true)
+    print("y_pred:", y_pred)
+
+    # 计算混淆矩阵
+    y = np.zeros(len(y_true))
+    y_ = np.zeros(len(y_true))
+    for i in range(len(y_true)):
+        y[i] = y_true[i]
+        y_[i] = y_pred[i]
+    cnf_mat = confusion_matrix(y, y_)
+    # print('cnf_mat = ', cnf_mat)
+
+    # 记录错分样本
+    error_list = []
+    for i in range(len(y_true)):
+        true = y_true[i].item()
+        pred = y_pred[i].item()
+        if true != pred:
+            error_list.append(true)
+    print("Error Classification:", error_list)
+
+    if classes > 2:
+        if isPlot:
+            # # 绘制混淆矩阵
+            plot_confusion_matrix(cnf_mat, range(classes), save_tag=save_tag)
+            # 计算多分类评价值
+
+    Acc = accuracy_score(y, y_, normalize=True)
+    # print("Acc = ", Acc)
+    # Sens = recall_score(y, y_, average='macro')
+    # Prec = precision_score(y, y_, average='macro')
+    # F1 = f1_score(y, y_, average='weighted')
+    return Acc # , Sens, Prec, F1 #, cnf_mat
+
+def accuracy1(x_out, y_true, classes, isPlot, save_tag=''):
+    x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
+    x_pro = x_softmax(x_out)
+
+    # y_pred = torch.argmax(x_pro, dim=1)
+    # 设置阈值为0.4，判断类别1的概率是否大于0.4
+    y_pred = (x_pro[:, 1] > 0.4).long()
+
     print("x_pro:", x_pro)
     print("y_true:", y_true)
     print("y_pred:", y_pred)

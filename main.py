@@ -5,6 +5,7 @@ from solver.solver_Kflod_DCAN import *
 # from solver.HX_Kflod_train import *
 # 测试版
 # from solver.tmp_solver import *
+
 import numpy as np
 from configs.config import *
 from print2log import *
@@ -20,6 +21,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
 
 def SearchSeedMain(config):
     model_save_path = './model_log'  # 模型存储路径
@@ -52,15 +54,16 @@ def SearchSeedMain(config):
 
     # 创建分类器
     clf = {
-        'svm': svm.SVC(kernel='rbf',  probability=True),
-        'lr': LogisticRegression(),
-        'dt': DecisionTreeClassifier(),
-        'rf': RandomForestClassifier(),
+        'svm': svm.SVC(kernel='rbf', class_weight='balanced',  probability=True),
+        'lr': LogisticRegression(class_weight='balanced'),
+        'dt': DecisionTreeClassifier(class_weight='balanced'),
+        'rf': RandomForestClassifier(class_weight='balanced'),
         'gb': GradientBoostingClassifier(),
         'knn': KNeighborsClassifier(n_neighbors=4),
+        'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100),
         'nb': GaussianNB(),
     }
-    for index in range(10):
+    for index in [1024, 13, 89, 117, 98]:
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
         total_avg_acc = 0.0
         mark = 1
@@ -80,10 +83,10 @@ def SearchSeedMain(config):
             # 引入更多的分类器
             x_train, y_train = clf_data_loader(extra, target, t_train_select)
 
-            for clf_name, clf_item in clf.items():
-                clf_item.fit(x_train, y_train)
+            # for clf_name, clf_item in clf.items():
+            #     clf_item.fit(x_train, y_train)
 
-            solver = SolverSeed(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select,
+            solver = SolverSeed(x_train, y_train, mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select,
                              t_valid_select=t_valid_select, model_save_path=model_save_path,
                              config=config, clfModel=clf)
 
@@ -138,6 +141,7 @@ def main(config):
         'gb': GradientBoostingClassifier(),
         'knn': KNeighborsClassifier(n_neighbors=4),
         'nb': GaussianNB(),
+        # 'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100)
     }
 
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
@@ -161,14 +165,6 @@ def main(config):
 
         for clf_name, clf_item in clf.items():
             clf_item.fit(x_train, y_train)
-
-        # 埋点1
-        end_time = time.time()  # 获取结束时间
-        print(f"svm对于 train 部分的训练时间: {end_time - start_time} 秒")
-        start_time = time.time()
-
-        # solver = Solver2(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select, t_valid_select=t_valid_select, model_save_path=model_save_path,
-        #                 config=config, clfModel=clf)
 
         # 使用cdAn的
         solver = SolverCDAN(mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select,
