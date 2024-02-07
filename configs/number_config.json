@@ -19,7 +19,10 @@
   "early_stop_step": 5,
   "interval": 16,
   "mode": 0,
-  "aug": 0
+  "aug": 0,
+  "searchSeed": 0,
+  "seed": 7,
+  "acc": 0.68
 }
 
 

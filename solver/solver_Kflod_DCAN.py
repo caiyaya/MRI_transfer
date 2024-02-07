@@ -23,7 +23,8 @@ plt.switch_backend('Agg')
 
 imgPath = "./caicaiImage/img"
 
-class SolverCDAN(object):
+
+class SolverSeed(object):
     def __init__(self,  mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
         self.config = config
         self.mark = mark # 交叉验证具体哪一折
@@ -32,26 +33,7 @@ class SolverCDAN(object):
         self.source = config.source  # 源域数据
         self.target = config.target  # 目标域数据
 
-        # 超参数
-        self.alpha = config.alpha
-        self.beta = config.beta
-
-        self.model_save_path = model_save_path # 保存模型的位置
-
         self.class_num = config.class_num  # 类别数目（二分类 or 多分类）
-        self.gpu = torch.cuda.is_available()  # GPU是否可以使用 默认使用
-
-        # 模型训练相关参数
-        self.epoch_num = config.epoch_num
-        self.batch_size = config.batch_size
-        self.optimizer = config.optimizer  # 优化器
-        self.scheduler = config.scheduler  # 迭代器
-        self.lr = config.learning_rate
-        self.momentum = config.momentum
-        self.weight_decay = config.weight_decay  # 权重衰减率
-        self.check_epoch = config.check_epoch
-        self.early_stop_step = config.early_stop_step
-        self.interval = config.interval  # 在训练过程中每隔interval就输出一次train acc之类的结果
 
         self.slice_size = config.slice_size
         self.modality = config.modality
@@ -59,21 +41,10 @@ class SolverCDAN(object):
         self.curr_epoch = 0
         self.feature_dim = config.feature_dim
 
-        # 在迭代中赋值，不需要传参的参数
-        self.clf = clfModel # 集成的机器学习分类器
-        self.fe_Net = None  # 特征提取器框架
-        self.lb_Cls = None  # 分类器框架
-        self.da_Net = None  # 域对抗网络
-        self.best_acc = 0
-        self.break_flag = False
-
-
-        # print(os.path.basename(__file__))
+        self.clf = clfModel  # 集成的机器学习分类器
 
         # 载入源数据、源标签、目标数据、目标标签
         print("dataset loading......")
-        # 埋点
-        start_time = time.time()
 
         # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
         s_train_list = s_train_select
@@ -131,11 +102,6 @@ class SolverCDAN(object):
             t_train_list.extend(t_train_list_aug)
             t_train_label_list.extend(t_train_label_list_aug)
 
-        # 埋点2
-        end_time = time.time()  # 获取结束时间
-        print(f"aug 路径拼接运行时间: {end_time - start_time} 秒")
-        start_time = time.time()
-
         # 有oversampling的版本
         # oversampling 策略？
         self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.xt_valid, self.yt_valid  = KflodDataloader(
@@ -149,18 +115,6 @@ class SolverCDAN(object):
             target_v_dir=t_valid_list,
             label_tv_dir=t_valid_label_list,
         )
-
-        # 埋点3
-        end_time = time.time()  # 获取结束时间
-        print(f"KflodDataloader数据加载运行时间: {end_time - start_time} 秒")
-        start_time = time.time()
-        # --------------------------------------------------------------------------------------------------------- #
-        # print("loading finished!")
-
-        # print("ys_train.shape = ", self.ys_train.shape[0])
-        # print("ys_test.shape = ", self.ys_test.shape[0])
-        # print("yt_train.shape = ", self.yt_train.shape[0])
-        # print("yt_test.shape = ", self.yt_test.shape[0])
 
         # 增加逻辑 将valid部分拆分为 test 和 valid
         # self.xt_valid, self.yt_valid
@@ -176,22 +130,189 @@ class SolverCDAN(object):
         self.xt_valid2 = np.array([self.xt_valid[i] for i in indices[split:]])
         self.yt_valid2 = np.array([self.yt_valid[i] for i in indices[split:]])
 
-        # 这里 indices 是随机重拍的 valid 部分 indices[:split]； test部分indices[split:]
-        # 这里需要获取的x_test 和 y_test 是 符合 t_valid_select顺序的
-        # 这里对应反了！！
-        # valid1 对应test valid2 对应 valid
-        # index = np.arange(valid_size/5)
-        # spl = int(valid_size/5 * 0.5)
-        # clf_t_test_select = [t_valid_select[int(i)] for i in index[:spl]]
-        # clf_t_valid_select = [t_valid_select[int(i)] for i in index[spl:]]
-        #
-        #
-        # x_valid, y_valid = clf_data_loader(extra, t_path, clf_t_valid_select)
-        #
-        # print("clf valid 测试：")
-        # y_pred = self.clf.predict(x_valid)
-        # print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
-        # self.x_test, self.y_test = clf_data_loader(extra, t_path, clf_t_test_select)
+        x, y = clf_data_loader(extra, t_path, t_valid_select)
+        splitline = split
+        self.x_test = np.array([x[int(i)] for i in indices[:splitline]])
+        self.y_test = np.array([y[int(i)] for i in indices[:splitline]])
+        x_valid = [x[int(i)] for i in indices[splitline:]]
+        y_valid = [y[int(i)] for i in indices[splitline:]]
+
+        print("clf valid 测试：")
+        for clf_name, clf_item in self.clf.items():
+            y_pred_proba = clf_item.predict_proba(x_valid)
+            # 选择概率最高的类别作为预测类别
+            y_pred = y_pred_proba.argmax(axis=1)
+
+            # 打印每个分类器的名称（如果分类器没有名称属性，这里可能需要修改）
+            print(f"\n分类器：{clf_name}")
+            print("clf valid Accuracy:", accuracy_score(y_valid, y_pred))
+
+            # 打印 y_pred 和 y_valid
+            # print("y_pred:", y_pred)
+            # print("y_valid:", y_valid)
+            # print("y_prob:", y_pred_proba)
+
+        # 搜索逻辑 应该和 最终使用的时候的融合逻辑相同
+        if config.searchSeed == 1:
+            print("clf test 测试：")
+            total_acc = 0.0
+            number_clf = 0
+            pred_proba = None
+            for clf_name, clf_item in self.clf.items():
+                number_clf += 1
+                y_pred_proba = clf_item.predict_proba(self.x_test)
+                if pred_proba is None:
+                    pred_proba = np.zeros_like(y_pred_proba)
+                pred_proba += y_pred_proba
+                # 选择概率最高的类别作为预测类别
+                y_pred = y_pred_proba.argmax(axis=1)
+                acc = accuracy_score(self.y_test, y_pred)
+                total_acc += acc
+                # 打印每个分类器的名称
+                print(f"\n分类器：{clf_name}")
+                print("clf valid Accuracy:", acc)
+            pred_proba = pred_proba / number_clf
+            y_pred = pred_proba.argmax(axis=1)
+            avg_acc = accuracy_score(self.y_test, y_pred)
+            print("平均accuracy为：{}, ".format(avg_acc))
+            self.test_avg_acc = avg_acc
+
+    def get_average_accuracy(self):
+        return self.test_avg_acc
+
+class SolverCDAN(object):
+    def __init__(self,  mark, extra, s_train_select, t_path, t_train_select, t_valid_select,  model_save_path, config, clfModel):
+        self.config = config
+        self.mark = mark # 交叉验证具体哪一折
+        self.mode = config.mode  # 判定是哪一个病症
+
+        self.source = config.source  # 源域数据
+        self.target = config.target  # 目标域数据
+
+        # 超参数
+        self.alpha = config.alpha
+        self.beta = config.beta
+
+        self.model_save_path = model_save_path # 保存模型的位置
+
+        self.class_num = config.class_num  # 类别数目（二分类 or 多分类）
+        self.gpu = torch.cuda.is_available()  # GPU是否可以使用 默认使用
+
+        # 模型训练相关参数
+        self.epoch_num = config.epoch_num
+        self.batch_size = config.batch_size
+        self.optimizer = config.optimizer  # 优化器
+        self.scheduler = config.scheduler  # 迭代器
+        self.lr = config.learning_rate
+        self.momentum = config.momentum
+        self.weight_decay = config.weight_decay  # 权重衰减率
+        self.check_epoch = config.check_epoch
+        self.early_stop_step = config.early_stop_step
+        self.interval = config.interval  # 在训练过程中每隔interval就输出一次train acc之类的结果
+
+        self.slice_size = config.slice_size
+        self.modality = config.modality
+
+        self.curr_epoch = 0
+        self.feature_dim = config.feature_dim
+
+        # 在迭代中赋值，不需要传参的参数
+        self.clf = clfModel # 集成的机器学习分类器
+        self.fe_Net = None  # 特征提取器框架
+        self.lb_Cls = None  # 分类器框架
+        self.da_Net = None  # 域对抗网络
+        self.best_acc = 0
+        self.break_flag = False
+
+
+        # print(os.path.basename(__file__))
+
+        # 载入源数据、源标签、目标数据、目标标签
+        print("dataset loading......")
+
+        # 根据五折交叉验证 整理s和t相关的数据和标签， s_train_list 和 s_train_label_list; s_val_list 和 s_val_label_list
+        s_train_list = s_train_select
+        # 这里需要对aug增加特判逻辑
+        s_train_label_list = []
+        for s in s_train_list:
+            if "aug" in s:
+                parts = s.split('/')
+                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+                new_parts = parts[:-2] + [parts[-1]]
+                new_parts[3] = 'label'
+                new_path = '/'.join(new_parts)
+                s_train_label_list.append(new_path)
+            else:
+                s_train_label_list.append(s.replace('npy', 'label'))
+
+
+        # 这里要根据 t_train_select 构建 训练和测试数据对
+        print("break point")
+        t_train_select_set = set(t_train_select)
+        t_train_list = []
+        for file_path in os.listdir(t_path):
+            if file_path.split('_')[1] in t_train_select_set:
+                t_train_list.append(os.path.join(t_path, file_path))
+
+        t_train_label_list = [t.replace('npy', 'label') for t in t_train_list]
+
+        t_valid_select_set = set(t_valid_select)
+        t_valid_list = []
+        for file_path in os.listdir(t_path):
+            if file_path.split('_')[1] in t_valid_select_set:
+                t_valid_list.append(os.path.join(t_path, file_path))
+
+        t_valid_label_list = [t.replace('npy', 'label') for t in t_valid_list]
+
+        # 这里判断是否要增加aug部分的数据
+        if config.aug == 1:
+            t_train_list_aug = []
+            t_path_aug = t_path.replace('npy', 'npy_aug')
+            for file_path_augs in os.listdir(t_path_aug):
+                for file_path in os.listdir(os.path.join(t_path_aug, file_path_augs)):
+                    if file_path.split('_')[1] in t_train_select_set:
+                        aug = os.path.join(file_path_augs, file_path)
+                        t_train_list_aug.append(os.path.join(t_path_aug, aug))
+            t_train_label_list_aug = []
+            for t in t_train_list_aug:
+                parts = t.split('/')
+                # 将'npy_aug'替换为'label'，并移除倒数第二个部分
+                new_parts = parts[:-2] + [parts[-1]]
+                new_parts[3] = 'label'
+                new_path = '/'.join(new_parts)
+                t_train_label_list_aug.append(new_path)
+
+            # 测试的时候valid 不做增强
+            t_train_list.extend(t_train_list_aug)
+            t_train_label_list.extend(t_train_label_list_aug)
+
+        # 有oversampling的版本
+        # oversampling 策略？
+        self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.xt_valid, self.yt_valid  = KflodDataloader(
+            self.slice_size,
+            self.modality, self.class_num,
+            self.mode,
+            source_dir=s_train_list,
+            label_s_dir=s_train_label_list,
+            target_dir=t_train_list,
+            label_t_dir=t_train_label_list,
+            target_v_dir=t_valid_list,
+            label_tv_dir=t_valid_label_list,
+        )
+
+        # 增加逻辑 将valid部分拆分为 test 和 valid
+        # self.xt_valid, self.yt_valid
+        # 这里有问题，可能对某个human重复采样，测算其最后结果，尽可能评估不同病人的 -> 顺序采样即可
+        # 这里应该直接前半部分是 valid 后半部分是test
+        valid_size = len(self.xt_valid)
+
+        indices = np.arange(valid_size)
+        # np.random.shuffle(indices)
+        split = int(valid_size * 0.5)  # 50%用于拆分
+        self.xt_valid1 = np.array([self.xt_valid[i] for i in indices[:split]])
+        self.yt_valid1 = np.array([self.yt_valid[i] for i in indices[:split]])
+        self.xt_valid2 = np.array([self.xt_valid[i] for i in indices[split:]])
+        self.yt_valid2 = np.array([self.yt_valid[i] for i in indices[split:]])
 
         x, y = clf_data_loader(extra, t_path, t_valid_select)
         splitline = split
@@ -203,7 +324,6 @@ class SolverCDAN(object):
         print("clf valid 测试：")
         for clf_name, clf_item in self.clf.items():
             y_pred_proba = clf_item.predict_proba(x_valid)
-
             # 选择概率最高的类别作为预测类别
             y_pred = y_pred_proba.argmax(axis=1)
 
@@ -215,13 +335,6 @@ class SolverCDAN(object):
             print("y_pred:", y_pred)
             print("y_valid:", y_valid)
             print("y_prob:", y_pred_proba)
-
-
-
-        # 埋点4
-        end_time = time.time()  # 获取结束时间
-        print(f"参数部分valid数据加载运行时间: {end_time - start_time} 秒")
-        start_time = time.time()
 
         # 载入Dataloader
         self.train_dataset = generate_dataset(self.xs_train, self.ys_train, self.xt_train, self.yt_train, self.batch_size, self.gpu)
@@ -235,11 +348,6 @@ class SolverCDAN(object):
         else:
             self.num_iter = len_target
 
-
-        # 埋点5
-        end_time = time.time()  # 获取结束时间
-        print(f"载入dataloader数据运行时间: {end_time - start_time} 秒")
-        start_time = time.time()
 
     def train_and_valid(self):
         train_acc = []
