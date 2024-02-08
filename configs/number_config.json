@@ -7,7 +7,7 @@
   "class_num": 2,
   "feature_dim" : 128,
   "alpha": 0,
-  "beta": 0.01,
+  "beta": 10,
   "epoch_num": 200,
   "batch_size": 8,
   "optimizer": "adam",
@@ -24,7 +24,8 @@
   "test_save": 1,
   "searchSeed": 0,
   "seed": 7,
-  "acc": 0.0
+  "acc": 0.0,
+  "slices": 1
 }
 
 

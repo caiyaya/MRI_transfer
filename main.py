@@ -41,8 +41,8 @@ def SearchSeedMain(config):
     for file_path in os.listdir(target):
         t_ids.add(file_path.split('_')[1])
         # # # 这里增加判断，看需要五折中的哪几折
-        # if(file_path.split('_')[2] == "2"):
-        t_path.append(os.path.join(target, file_path))
+        if(file_path.split('_')[2] == "2"):
+            t_path.append(os.path.join(target, file_path))
 
     # 如果需要使用aug数据
     if config.aug == 1:
@@ -63,11 +63,11 @@ def SearchSeedMain(config):
         'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100),
         'nb': GaussianNB(),
     }
-    for index in [1024, 13, 89, 117, 98]:
+    for index in [1, 7, 5, 60]:
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
         total_avg_acc = 0.0
         mark = 1
-        kf = KFold(n_splits=5, shuffle=True, random_state=index) # 五折相当于0.2，后续可以调整
+        kf = KFold(n_splits=5, shuffle=True, random_state=1) # 五折相当于0.2，后续可以调整
         t_ids = list(t_ids)
         for (t_train_index, t_valid_index) in kf.split(list(t_ids)):
             # 埋点，测算代码耗时部分
@@ -81,10 +81,19 @@ def SearchSeedMain(config):
             # 提取train中id 对应的 参数信息
             # svm训练 参数信息
             # 引入更多的分类器
-            x_train, y_train = clf_data_loader(extra, target, t_train_select)
+            x_train, y_train, path_train = clf_data_loader(extra, target, t_train_select)
 
+            # 测试 对齐 param数据
+            # 就应该直接看svm的，knn的效果很差
+            # x_test, y_test, path_train_test = clf_data_loader(extra, target, t_valid_select)
             # for clf_name, clf_item in clf.items():
             #     clf_item.fit(x_train, y_train)
+            #     y_pre = clf_item.predict(x_test)
+            #
+            #     accuracy = accuracy_score(y_test, y_pre)
+            #     print(f"真值为：{y_test}")
+            #     print(f"预测结果为：{y_pre}")
+            #     print(f"Accuracy: {accuracy}")
 
             solver = SolverSeed(x_train, y_train, mark=mark, extra=extra, s_train_select=s_path, t_path=target, t_train_select=t_train_select,
                              t_valid_select=t_valid_select, model_save_path=model_save_path,
@@ -161,7 +170,7 @@ def main(config):
         # 提取train中id 对应的 参数信息
         # svm训练 参数信息
         # 引入更多的分类器
-        x_train, y_train = clf_data_loader(extra, target, t_train_select)
+        x_train, y_train, path_train = clf_data_loader(extra, target, t_train_select)
 
         for clf_name, clf_item in clf.items():
             clf_item.fit(x_train, y_train)

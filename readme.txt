@@ -180,7 +180,7 @@ todo：
 
 【1】random seed 的搜索 -> 分类器 [已完成] # 最好针对每个clf 都进行一次调参 看下表现 在决定是否加入到当前clf集合中
 【2】模型集成的融合策略【论文】
-【3】对齐策略？cmd; lmmd; mmd; ot_loss; coral_loss [跑下实验看下]
+【3】对齐策略？cmd; lmmd; mmd; ot_loss; coral_loss  -> 实现 mcc loss[已完成，已重调参】
  [3.5] 保存数据根据test的表现 【已完成】
 【4】文字版的跑实验的教程；具体的设置（数据集的划分，效果）；pdf的效果；
 -> 明晚七八点；
@@ -202,3 +202,4 @@ todo：
 
     -> multi branch 多任务学习？ 为啥引入迁移学习
 
+ps: random_state 在kfold 中指定 可复现

@@ -67,7 +67,7 @@ class SolverSeed(object):
         t_train_select_set = set(t_train_select)
         t_train_list = []
         for file_path in os.listdir(t_path):
-            if file_path.split('_')[1] in t_train_select_set:
+            if file_path.split('_')[1] in t_train_select_set and file_path.split('_')[2] == "0":
                 t_train_list.append(os.path.join(t_path, file_path))
 
         t_train_label_list = [t.replace('npy', 'label') for t in t_train_list]
@@ -75,7 +75,7 @@ class SolverSeed(object):
         t_valid_select_set = set(t_valid_select)
         t_valid_list = []
         for file_path in os.listdir(t_path):
-            if file_path.split('_')[1] in t_valid_select_set:
+            if file_path.split('_')[1] in t_valid_select_set and file_path.split('_')[2] == "0":
                 t_valid_list.append(os.path.join(t_path, file_path))
 
         t_valid_label_list = [t.replace('npy', 'label') for t in t_valid_list]
@@ -130,7 +130,7 @@ class SolverSeed(object):
         self.xt_valid2 = np.array([self.xt_valid[i] for i in indices[split:]])
         self.yt_valid2 = np.array([self.yt_valid[i] for i in indices[split:]])
 
-        x, y = clf_data_loader(extra, t_path, t_valid_select)
+        x, y, path = clf_data_loader(extra, t_path, t_valid_select)
         splitline = split
         self.x_test = np.array([x[int(i)] for i in indices[:splitline]])
         self.y_test = np.array([y[int(i)] for i in indices[:splitline]])
@@ -170,13 +170,14 @@ class SolverSeed(object):
                 # 打印每个分类器的名称
                 print(f"\n分类器：{clf_name}")
                 # 打印 y_pred 和 y_valid
-                # print("y_pred:", y_pred)
-                # print("y_valid:", y_valid)
+                print("y_pred:", y_pred)
+                print("y_valid:", self.y_test)
                 # print("y_prob:", y_pred_proba)
                 print("clf test Accuracy:", acc)
             pred_proba = pred_proba / number_clf
 
             print("各分类器加权概率：{}".format(pred_proba))
+            # 这里cfg 中配置可启动对应的阈值搜索 后期提点可用
             # 计算一个更好的分类的阈值
             # 尝试的阈值范围，例如从0.1到0.9，步长为0.01
             best_acc = 0.0
@@ -283,7 +284,7 @@ class SolverCDAN(object):
         t_valid_select_set = set(t_valid_select)
         t_valid_list = []
         for file_path in os.listdir(t_path):
-            if file_path.split('_')[1] in t_valid_select_set:
+            if file_path.split('_')[1] in t_valid_select_set and file_path.split('_')[2] == "0":
                 t_valid_list.append(os.path.join(t_path, file_path))
 
         t_valid_label_list = [t.replace('npy', 'label') for t in t_valid_list]
@@ -338,7 +339,7 @@ class SolverCDAN(object):
         self.xt_valid2 = np.array([self.xt_valid[i] for i in indices[split:]])
         self.yt_valid2 = np.array([self.yt_valid[i] for i in indices[split:]])
 
-        x, y = clf_data_loader(extra, t_path, t_valid_select)
+        x, y, path = clf_data_loader(extra, t_path, t_valid_select)
         splitline = split
         self.x_test = np.array([x[int(i)] for i in indices[:splitline]])
         self.y_test = np.array([y[int(i)] for i in indices[:splitline]])
@@ -476,12 +477,11 @@ class SolverCDAN(object):
         self.model_train()
         self.scheduler_step()
 
-        # 每轮打印 cls loss 和 adv loss 观察变化
+        # 每轮打印 cls loss adv loss align loss 观察变化
         total_cls_loss = 0.0
         total_adv_loss = 0.0
         total_align_loss = 0.0
         total_batches = 0
-        new_lambda_value = self.config.beta
         for step, train_data in enumerate(dataset):
             xs = train_data['S']
             xt = train_data['T']
@@ -537,12 +537,12 @@ class SolverCDAN(object):
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
-            total_align_loss += align_loss.item()
+            total_align_loss += self.beta * align_loss.item()
             total_batches += 1
 
             # 依赖beta*损失函数 实现对抗和分类的调控
             # loss = cls_loss + self.beta * adv_loss + align_loss
-            loss = cls_loss +  adv_loss +  align_loss
+            loss = cls_loss +  adv_loss +  100 * align_loss
 
             acc = accuracy(self.config.thr, xs_out, ys.cpu(), self.class_num, 0)
             Acc.append(acc)
@@ -563,19 +563,23 @@ class SolverCDAN(object):
         avg_adv_loss = total_adv_loss / total_batches
         avg_align_loss = total_align_loss / total_batches
         print(
-            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}， Average Align Loss: {avg_align_loss:.4f}')
+            f'Epoch {epoch}, Average Cls Loss: {avg_cls_loss:.4f}, Average Adv Loss: {avg_adv_loss:.4f}， self.beta:{self.beta}, Average Align Loss: {avg_align_loss:.4f}')
         # 基于损失反馈的动态调整self.beta self.alpha
         # 如何给定调整策略？
         # 设置阈值和调整因子
-        threshold_increase = 2  # 当adv_loss是cls_loss的2倍时开始减少beta
-        adjust_factor_decrease = 0.9  # 减少beta的因子
+        # 这块得精心调整
+        threshold_increase = 10  # 当adv_loss是cls_loss的10倍时开始减少beta
+        threshold_decrease = 0.5
+        adjust_factor = 0.1  # 减少beta的因子
 
         # 动态调整beta
-        if avg_adv_loss / avg_cls_loss > threshold_increase:
-            self.beta *= adjust_factor_decrease
+        if avg_align_loss / avg_cls_loss > threshold_increase:
+            self.beta *= adjust_factor
+        if avg_align_loss / avg_cls_loss < threshold_decrease:
+            self.beta /= adjust_factor
 
-        # 保证beta在合理范围内
-        self.beta = max(0.001, min(self.beta, 0.01))
+        # 保证beta在合理范围内 【0.01 0.1】
+        self.beta = max(0.1, min(self.beta, 1000))
 
         print('     [Train S] Acc: {a:.3f}, Loss: {l}'.format(a=Acc_last, l=Loss_last))
 
@@ -782,8 +786,8 @@ class SolverCDAN(object):
                 loss = cls_loss
                 # acc, Sens, Prec, F1 = accuracy(xt_out, yt, self.class_num, 0)
 
-                acc = accuracy1(xt_out, yt, self.class_num, 0)
-                # acc = accuracyClf(self.config.thr, resDict, xt_out, yt, self.class_num, 0)
+                # acc = accuracy(xt_out, yt, self.class_num, 0)
+                acc = accuracyClf(self.config.thr, resDict, xt_out, yt, self.class_num, 0)
                 Acc.append(acc)
                 Loss.append(loss)
 

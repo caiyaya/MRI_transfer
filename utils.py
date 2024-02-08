@@ -227,20 +227,26 @@ def accuracyClf(thr, resDict, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
 
-    # 通过加权融合的方式 将各个分类器的预测概率加入
-    for name, res in resDict.items():
-        res = torch.tensor(res).cuda()
-        print("{}:".format(name), res)
-        x_fuse = (res + x_pro) / 2
+    # 这里先计算 acc 如果好的话 则不引入分类器
+    y_pred = torch.argmax(x_pro, dim=1)
+    temp_acc = accuracy_score(y_pred.cpu(), y_true.cpu())
+    if temp_acc < 0.8:
+        print("cdan框架acc：{}, 引入分类器".format(temp_acc))
+        # 通过加权融合的方式 将各个分类器的预测概率加入
+        x_fuse = x_pro
+        for name, res in resDict.items():
+            res = torch.tensor(res).cuda()
+            print("{}:".format(name), res)
+            x_fuse = (res + x_fuse) / 2
+        # 看是否增加分类器阈值 默认不增加
+        if thr > 0.0:
+            y_pred = (x_fuse[:, 1] > thr).long()
+        else:
+            y_pred = torch.argmax(x_fuse, dim=1)
 
-    if thr > 0.0:
-        y_pred = (x_fuse[:, 1] > thr).long()
-    else:
-        y_pred = torch.argmax(x_fuse, dim=1)
-
-    print("x_pro:", x_pro)
-    print("y_true:", y_true)
-    print("y_pred:", y_pred)
+        print("x_pro:", x_pro)
+        print("y_true:", y_true)
+        print("y_pred:", y_pred)
 
     # 计算混淆矩阵
     y = np.zeros(len(y_true))

@@ -24,37 +24,52 @@ def clf_data_loader(extra, target, t_train_select):
         if file_path.split("_")[1].split(".")[0] in t_train_select_set:
             clf_train_list.append(os.path.join(extra, file_path))
     clf_train_label_list = []
-    for file_path in os.listdir(target.replace('npy', 'label')):
-        if file_path.split("_")[1] in t_train_select_set:
-            clf_train_label_list.append(os.path.join(target.replace('npy', 'label'), file_path))
+    for file_path in clf_train_list:
+        addr = file_path.replace('human_extra', 'human/label')
+        clf_train_label_list.append(addr.split('.npy')[0])
 
+    slices =  1
     # 准备分类器的数据
     x_train = []
+    path_train = []
     y_train = []
     for data_path in clf_train_list:
         data = np.load(data_path)
-        for i in range(5): ## 数据会扩增为五份
+        if slices == 1:
             x_train.append(data)
+            path_train.append(data_path)
+        else:
+            for i in range(slices): ## 数据会扩增为五份
+                x_train.append(data)
+                path_train.append(data_path)
+
 
     for label_path in clf_train_label_list:
-        label_path = os.path.join(label_path, 'label.txt')
-        with open(label_path, 'r') as label_file:
-            label = label_file.readline().strip().split(',')[0]  # 读取第一行的第一个值
-            label = int(label)  # 转换为整数
-            # 根据label值进行处理，小于3则为0，否则为1
-            label = 0 if label < 3 else 1
-            y_train.append(label)
+        if slices == 1:
+            label_path = os.path.join(label_path + "_0", "label.txt")
+            with open(label_path, 'r') as label_file:
+                label = label_file.readline().strip().split(',')[0]  # 读取第一行的第一个值
+                label = int(label)  # 转换为整数
+                # 根据label值进行处理，小于3则为0，否则为1
+                label = 0 if label < 3 else 1
+                y_train.append(label)
+        else:
+            for index in range(slices):
+                temp = label_path
+                temp = temp + "_{}".format(index)
+                temp = os.path.join(temp, "label.txt")
+                with open(temp, 'r') as label_file:
+                    label = label_file.readline().strip().split(',')[0]  # 读取第一行的第一个值
+                    label = int(label)  # 转换为整数
+                    # 根据label值进行处理，小于3则为0，否则为1
+                    label = 0 if label < 3 else 1
+                    y_train.append(label)
+
 
     x_train = np.array(x_train)
-    # 删除 mri 和 f 列
-    # x_train_4 =np.delete(x_train, [1, 3], axis=1)
     y_train = np.array(y_train)
 
-    # 标准化处理
-    # scaler = StandardScaler()
-    # x_train_scaled = scaler.fit_transform(x_train_4)
-
-    return x_train, y_train
+    return x_train, y_train, path_train
 
 
 def return_dataset(domain_name, usps, scale, all_use):
