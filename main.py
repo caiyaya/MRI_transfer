@@ -63,11 +63,11 @@ def SearchSeedMain(config):
         'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100),
         'nb': GaussianNB(),
     }
-    for index in [1, 7, 5, 60]:
+    for index in [7, 13, 42]: # 随机种子
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------
         total_avg_acc = 0.0
         mark = 1
-        kf = KFold(n_splits=5, shuffle=True, random_state=1) # 五折相当于0.2，后续可以调整
+        kf = KFold(n_splits=5, shuffle=True, random_state=index) # 五折相当于0.2，后续可以调整
         t_ids = list(t_ids)
         for (t_train_index, t_valid_index) in kf.split(list(t_ids)):
             # 埋点，测算代码耗时部分
@@ -150,7 +150,7 @@ def main(config):
         'gb': GradientBoostingClassifier(),
         'knn': KNeighborsClassifier(n_neighbors=4),
         'nb': GaussianNB(),
-        # 'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100)
+        'net': MLPClassifier(hidden_layer_sizes=(64, 32, 16), activation='relu', solver='adam', max_iter=100)
     }
 
     # -------------------五折划分目标域训练集、验证集和测试集（源域全部用于训练）--------------------

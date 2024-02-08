@@ -151,6 +151,7 @@ class SolverSeed(object):
         y = np.concatenate((y_train, y_valid))
         for clf_name, clf_item in self.clf.items():
             clf_item.fit(x, y)
+        # 分类器模型融合
         # 搜索逻辑 应该和 最终使用的时候的融合逻辑相同
         if config.searchSeed == 1:
             print("clf test 测试：")
@@ -171,7 +172,7 @@ class SolverSeed(object):
                 print(f"\n分类器：{clf_name}")
                 # 打印 y_pred 和 y_valid
                 print("y_pred:", y_pred)
-                print("y_valid:", self.y_test)
+                print("y_test:", self.y_test)
                 # print("y_prob:", y_pred_proba)
                 print("clf test Accuracy:", acc)
             pred_proba = pred_proba / number_clf
@@ -533,7 +534,7 @@ class SolverCDAN(object):
             cross_loss = nn.CrossEntropyLoss()
             cls_loss = cross_loss(xs_out, ys)
 
-            # -----------------分类+对抗---------------------- #
+            # -----------------分类 + 对抗 + 对齐---------------------- #
             # 累加损失值和批次计数
             total_cls_loss += cls_loss.item()
             total_adv_loss += adv_loss.item()
@@ -541,8 +542,10 @@ class SolverCDAN(object):
             total_batches += 1
 
             # 依赖beta*损失函数 实现对抗和分类的调控
-            # loss = cls_loss + self.beta * adv_loss + align_loss
-            loss = cls_loss +  adv_loss +  100 * align_loss
+            # loss = cls_loss +  adv_loss + align_loss
+            self.beta = 1.0
+            # 先跑固定的 0.01 0.1 1 10 100
+            loss = cls_loss +  adv_loss +  self.beta * align_loss
 
             acc = accuracy(self.config.thr, xs_out, ys.cpu(), self.class_num, 0)
             Acc.append(acc)
@@ -568,7 +571,7 @@ class SolverCDAN(object):
         # 如何给定调整策略？
         # 设置阈值和调整因子
         # 这块得精心调整
-        threshold_increase = 10  # 当adv_loss是cls_loss的10倍时开始减少beta
+        threshold_increase = 10  # 当align_loss是cls_loss的10倍时开始减少beta
         threshold_decrease = 0.5
         adjust_factor = 0.1  # 减少beta的因子
 
@@ -684,7 +687,7 @@ class SolverCDAN(object):
         return Acc_v, Loss_v
 
     def test_process(self, epoch, dataset):
-        # 这里传入的目标域的test部分 可以同步观测test集表现
+        # 这里传入的目标域的test部分 可以同步观测cadn在test集表现
         Acc = []
         Loss = []
         Sens = []
@@ -981,7 +984,6 @@ class SolverCDAN(object):
             if int(mm) == self.mark and float(acc) >= best_acc:
                 best_result = file
                 best_acc = float(acc)
-        # 这里看下 best_result 是否有问题
         read_path = os.path.join(self.model_save_path, best_result)
         fea_path = os.path.join(read_path, "fe_Net.pkl")
         cls_path = os.path.join(read_path, "lb_Cls.pkl")

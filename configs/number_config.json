@@ -19,11 +19,11 @@
   "early_stop_step": 5,
   "interval": 16,
   "mode": 0,
-  "aug": 0,
+  "aug": 1,
   "thr": 0.0,
   "test_save": 1,
   "searchSeed": 0,
-  "seed": 7,
+  "seed": 13,
   "acc": 0.0,
   "slices": 1
 }

@@ -226,7 +226,7 @@ def accuracy(thr, x_out, y_true, classes, isPlot, save_tag=''):
 def accuracyClf(thr, resDict, x_out, y_true, classes, isPlot, save_tag=''):
     x_softmax = nn.Softmax(dim=1)  # 沿维度1进行softmax操作
     x_pro = x_softmax(x_out)
-
+    print("x_pro:", x_pro)
     # 这里先计算 acc 如果好的话 则不引入分类器
     y_pred = torch.argmax(x_pro, dim=1)
     temp_acc = accuracy_score(y_pred.cpu(), y_true.cpu())
@@ -244,9 +244,8 @@ def accuracyClf(thr, resDict, x_out, y_true, classes, isPlot, save_tag=''):
         else:
             y_pred = torch.argmax(x_fuse, dim=1)
 
-        print("x_pro:", x_pro)
-        print("y_true:", y_true)
-        print("y_pred:", y_pred)
+    print("y_true:", y_true)
+    print("y_pred:", y_pred)
 
     # 计算混淆矩阵
     y = np.zeros(len(y_true))
